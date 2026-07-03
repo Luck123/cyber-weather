@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.min.css
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp / Cache
+.cache/
+.tmp/
+*.tmp
+
+# WorkBuddy cache (user-specific)
+.workbuddy/cache/
+.workbuddy/sessions/
+.workbuddy/agents/
+.workbuddy/skills/
+.workbuddy/memory/*.md
+!.workbuddy/memory/.gitkeep
+.workbuddy/plans/
+.workbuddy/logs/
+.workbuddy/blobs/
+.workbuddy/usage/
+.workbuddy/state/
+.workbuddy/recordings/
+.workbuddy/indexes/
+.workbuddy/workbuddy.db
+.workbuddy/workbuddy.db-*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# System
+$RECYCLE.BIN/
+
+# Project-specific: keep memory logs in repo, but exclude any large runtime data

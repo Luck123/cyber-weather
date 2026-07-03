@@ -1,0 +1,3141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>赛博天气 · 赛博黄历</title>
+<style>
+  /* ============================================================
+     基础重置
+     ============================================================ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100dvh; }
+  body {
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    color: #d8f3ff;
+    background: #04050d;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    line-height: 1.5;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  ::selection { background: rgba(0, 255, 255, 0.35); color: #fff; }
+
+  /* ============================================================
+     赛博朋克背景层
+     ============================================================ */
+  .bg-base {
+    position: fixed; inset: 0; z-index: -3;
+    background:
+      radial-gradient(ellipse 70% 50% at 15% 10%, rgba(255, 0, 170, 0.18), transparent 60%),
+      radial-gradient(ellipse 80% 60% at 85% 90%, rgba(0, 240, 255, 0.18), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 50% 50%, rgba(180, 0, 255, 0.10), transparent 70%),
+      linear-gradient(180deg, #04050d 0%, #0a0420 50%, #04050d 100%);
+  }
+  .bg-grid {
+    position: fixed; inset: 0; z-index: -2;
+    background-image:
+      linear-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 240, 255, 0.06) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: linear-gradient(180deg, transparent 0%, black 20%, black 80%, transparent 100%),
+                 radial-gradient(ellipse at center, black 30%, transparent 90%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 20%, black 80%, transparent 100%),
+                        radial-gradient(ellipse at center, black 30%, transparent 90%);
+    transform: perspective(800px) rotateX(60deg) translateY(20%) scale(2);
+    transform-origin: center top;
+    animation: gridScroll 20s linear infinite;
+  }
+  @keyframes gridScroll {
+    0% { background-position: 0 0, 0 0; }
+    100% { background-position: 0 60px, 60px 0; }
+  }
+  .bg-scanlines {
+    position: fixed; inset: 0; z-index: -1;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 255, 255, 0.02) 0px,
+      rgba(0, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+  }
+  .bg-orb {
+    position: fixed; border-radius: 50%; filter: blur(100px);
+    z-index: -1; opacity: 0.5; pointer-events: none;
+  }
+  .bg-orb.o1 { width: 500px; height: 500px; background: #ff00aa; top: -150px; left: -150px; animation: orbFloat1 18s ease-in-out infinite; }
+  .bg-orb.o2 { width: 450px; height: 450px; background: #00f0ff; bottom: -150px; right: -150px; animation: orbFloat2 22s ease-in-out infinite; }
+  .bg-orb.o3 { width: 350px; height: 350px; background: #b400ff; top: 40%; left: 50%; animation: orbFloat3 25s ease-in-out infinite; }
+  @keyframes orbFloat1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(80px,60px) scale(1.2); } }
+  @keyframes orbFloat2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-60px,-50px) scale(1.15); } }
+  @keyframes orbFloat3 { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.3); } }
+
+  /* ============================================================
+     通用容器
+     ============================================================ */
+  .container {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 24px 20px 60px;
+    position: relative;
+  }
+
+  /* ============================================================
+     顶部 Header
+     ============================================================ */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+    margin-bottom: 28px;
+    padding: 18px 24px;
+    position: relative;
+  }
+  .cyber-panel {
+    background: linear-gradient(135deg, rgba(10, 14, 36, 0.7), rgba(20, 8, 40, 0.5));
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    border-radius: 4px;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+    box-shadow:
+      0 0 20px rgba(0, 240, 255, 0.15),
+      inset 0 0 20px rgba(0, 240, 255, 0.03);
+  }
+  .cyber-panel::before, .cyber-panel::after {
+    content: ''; position: absolute; width: 12px; height: 12px;
+    border: 1px solid #00f0ff;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+  }
+  .cyber-panel::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .cyber-panel::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark {
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, rgba(255, 0, 170, 0.3), rgba(0, 240, 255, 0.3));
+    border: 1px solid #00f0ff;
+    position: relative;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.5), inset 0 0 12px rgba(0, 240, 255, 0.3);
+  }
+  .brand-mark::before, .brand-mark::after {
+    content: ''; position: absolute; width: 6px; height: 6px;
+    background: #ff00aa; box-shadow: 0 0 6px #ff00aa;
+  }
+  .brand-mark::before { top: -3px; left: -3px; }
+  .brand-mark::after { bottom: -3px; right: -3px; }
+  .brand-mark svg { width: 26px; height: 26px; color: #fff; filter: drop-shadow(0 0 4px #00f0ff); }
+  .brand h1 {
+    font-family: "Orbitron", "Rajdhani", monospace;
+    font-size: 20px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #00f0ff, #ff00aa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+  }
+  .brand p {
+    font-size: 11px; color: #88c4d9; margin-top: 2px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    font-family: "Orbitron", monospace;
+  }
+  .header-status {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; font-size: 11px;
+    font-family: "Orbitron", monospace; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    text-shadow: 0 0 6px #00f0ff;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #00f0ff;
+    box-shadow: 0 0 8px #00f0ff;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(0, 240, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
+  }
+  .clock {
+    font-family: "Orbitron", monospace;
+    font-size: 14px; font-weight: 500;
+    color: #ff00aa;
+    text-shadow: 0 0 8px rgba(255, 0, 170, 0.7);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============================================================
+     工具栏
+     ============================================================ */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+    margin-bottom: 18px;
+    padding: 12px 16px;
+    position: relative;
+    z-index: 100;
+    overflow: visible;
+  }
+  .toolbar-title {
+    display: flex; align-items: center; gap: 10px;
+    font-family: "Orbitron", monospace;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.15em;
+    text-transform: uppercase; color: #00f0ff;
+    text-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+  }
+  .toolbar-title::before {
+    content: ''; width: 4px; height: 18px; background: #ff00aa;
+    box-shadow: 0 0 8px #ff00aa;
+  }
+  .toolbar-actions { display: flex; gap: 10px; align-items: center; }
+  .toolbar-sub { color: #6b8fa3; font-size: 11px; letter-spacing: 0.1em; }
+
+  /* ===== 搜索框 ===== */
+  .toolbar-search {
+    position: relative;
+    flex: 1; max-width: 320px; min-width: 200px;
+    display: flex; align-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 0 10px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .toolbar-search:focus-within {
+    border-color: #00f0ff;
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.4), inset 0 0 8px rgba(0, 240, 255, 0.1);
+  }
+  .search-icon {
+    color: #00f0ff; font-size: 16px;
+    text-shadow: 0 0 6px #00f0ff;
+    margin-right: 6px; font-family: "Orbitron", monospace;
+  }
+  #citySearch {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: #fff; font-size: 13px; padding: 8px 0;
+    font-family: "Orbitron", "PingFang SC", sans-serif;
+    letter-spacing: 0.02em;
+  }
+  #citySearch::placeholder { color: #4a6a7a; }
+  .search-clear {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255, 0, 170, 0.2); color: #ff00aa;
+    font-size: 14px; line-height: 1; cursor: pointer;
+    border: 1px solid rgba(255, 0, 170, 0.4);
+    transition: all 0.15s;
+  }
+  .search-clear:hover { background: #ff00aa; color: #04050d; }
+  .search-dropdown {
+    position: fixed;
+    max-height: 360px; overflow-y: auto;
+    background: rgba(8, 12, 28, 0.98);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(0, 240, 255, 0.5);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 240, 255, 0.3);
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    z-index: 9999;
+    display: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 240, 255, 0.4) transparent;
+  }
+  .search-dropdown::-webkit-scrollbar { width: 6px; }
+  .search-dropdown::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.4); }
+  .search-dropdown.show { display: block; animation: dropIn 0.2s ease; }
+  @keyframes dropIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .search-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; cursor: pointer;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.08);
+    transition: background 0.15s;
+  }
+  .search-item:hover { background: rgba(0, 240, 255, 0.08); }
+  .search-item:last-child { border-bottom: none; }
+  .search-item.disabled { opacity: 0.4; cursor: not-allowed; }
+  .search-item.disabled:hover { background: transparent; }
+  .search-item .si-flag {
+    font-size: 9px; padding: 2px 6px;
+    background: rgba(0, 240, 255, 0.15);
+    color: #67e8f9;
+    font-family: "Orbitron", monospace; letter-spacing: 0.1em;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+  }
+  .search-item .si-info { flex: 1; min-width: 0; }
+  .search-item .si-name {
+    color: #fff; font-size: 13px; font-weight: 600;
+    font-family: "PingFang SC", sans-serif;
+  }
+  .search-item .si-en {
+    color: #6b8fa3; font-size: 10px; margin-left: 6px;
+    font-family: "Orbitron", monospace;
+  }
+  .search-item .si-country {
+    color: #88c4d9; font-size: 10px; margin-top: 2px;
+    font-family: "PingFang SC", sans-serif;
+  }
+  .search-item .si-action {
+    font-size: 10px; padding: 4px 10px;
+    background: rgba(0, 240, 255, 0.12);
+    color: #00f0ff;
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    font-family: "Orbitron", monospace; letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .search-item.disabled .si-action {
+    background: rgba(107, 143, 163, 0.15);
+    color: #6b8fa3; border-color: rgba(107, 143, 163, 0.3);
+  }
+  .search-empty {
+    padding: 20px; text-align: center;
+    color: #6b8fa3; font-size: 12px;
+  }
+
+  /* ===== 模态框 ===== */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(2, 4, 12, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 998;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.show { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal-panel {
+    position: relative;
+    width: 100%; max-width: 560px; max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: linear-gradient(160deg, rgba(10, 18, 42, 0.95), rgba(28, 6, 48, 0.9));
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.3), 0 20px 60px rgba(0, 0, 0, 0.5);
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+    padding: 28px 30px 24px;
+    animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 240, 255, 0.4) transparent;
+  }
+  .modal-panel::-webkit-scrollbar { width: 6px; }
+  .modal-panel::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.4); }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal-close {
+    position: absolute; top: 14px; right: 14px;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255, 0, 170, 0.1);
+    border: 1px solid rgba(255, 0, 170, 0.4);
+    color: #ff00aa; font-size: 20px; line-height: 1;
+    cursor: pointer; z-index: 2;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover {
+    background: #ff00aa; color: #04050d;
+    box-shadow: 0 0 16px rgba(255, 0, 170, 0.6);
+  }
+  .modal-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-right: 40px; }
+  .modal-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    background: radial-gradient(circle, rgba(0, 240, 255, 0.2), transparent 70%);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+  }
+  .modal-title {
+    font-size: 20px; font-weight: 600; color: #fff;
+    letter-spacing: 0.04em; text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+    font-family: "Orbitron", "PingFang SC", sans-serif;
+  }
+  .modal-subtitle {
+    font-size: 11px; color: #88c4d9; margin-top: 4px;
+    font-family: "Orbitron", monospace; letter-spacing: 0.1em;
+  }
+  .modal-current {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 18px 0; margin-bottom: 16px;
+    border-top: 1px dashed rgba(0, 240, 255, 0.2);
+    border-bottom: 1px dashed rgba(0, 240, 255, 0.2);
+  }
+  .modal-temp {
+    font-family: "Orbitron", monospace;
+    font-size: 56px; font-weight: 300; line-height: 1;
+    color: #fff; text-shadow: 0 0 20px rgba(0, 240, 255, 0.7);
+  }
+  .modal-temp-unit { font-size: 24px; color: #00f0ff; font-weight: 400; }
+  .modal-desc { color: #88c4d9; font-size: 13px; margin-left: auto; }
+  .modal-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 480px) { .modal-grid { grid-template-columns: repeat(2, 1fr); } }
+  .modal-grid .hud-item { padding: 10px; }
+  .modal-section { margin-bottom: 18px; }
+  .modal-section-title {
+    font-size: 10px; color: #6b8fa3;
+    font-family: "Orbitron", monospace; letter-spacing: 0.15em;
+    text-transform: uppercase; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .modal-section-title::before {
+    content: ''; width: 4px; height: 14px;
+    background: #ff00aa; box-shadow: 0 0 6px #ff00aa;
+  }
+  .modal-info {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px;
+    font-size: 12px;
+  }
+  .modal-info .mi-row {
+    display: flex; justify-content: space-between;
+    padding: 6px 0; border-bottom: 1px dashed rgba(0, 240, 255, 0.1);
+  }
+  .modal-info .mi-label { color: #6b8fa3; font-family: "Orbitron", monospace; font-size: 10px; letter-spacing: 0.08em; }
+  .modal-info .mi-value { color: #fff; font-weight: 500; }
+  .modal-forecast {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  }
+  @media (max-width: 480px) { .modal-forecast { grid-template-columns: repeat(4, 1fr); } }
+  .mf-day {
+    text-align: center; padding: 10px 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 240, 255, 0.12);
+  }
+  .mf-day .mf-date { font-size: 10px; color: #6b8fa3; font-family: "Orbitron", monospace; }
+  .mf-day .mf-icon { font-size: 18px; margin: 4px 0; }
+  .mf-day .mf-temp { font-size: 11px; color: #fff; font-weight: 600; font-family: "Orbitron", monospace; }
+  .mf-day .mf-temp .lo { color: #6b8fa3; font-weight: 400; }
+  .modal-actions {
+    display: flex; gap: 10px; margin-top: 20px;
+    padding-top: 16px; border-top: 1px dashed rgba(0, 240, 255, 0.2);
+  }
+  .modal-actions .btn { flex: 1; padding: 10px; }
+
+  /* ===== 移除按钮 (卡片右上角) ===== */
+  .remove-btn {
+    position: absolute; top: 6px; right: 6px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(255, 0, 170, 0.15);
+    border: 1px solid rgba(255, 0, 170, 0.4);
+    color: #ff00aa; font-size: 14px; line-height: 1;
+    cursor: pointer; z-index: 3;
+    opacity: 0; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .city-card:hover .remove-btn { opacity: 1; }
+  .remove-btn:hover {
+    background: #ff00aa; color: #04050d;
+    box-shadow: 0 0 12px rgba(255, 0, 170, 0.6);
+  }
+  .remove-btn.removing {
+    pointer-events: none;
+    animation: cardRemove 0.4s ease forwards;
+  }
+  @keyframes cardRemove {
+    to { opacity: 0; transform: scale(0.8); }
+  }
+  .city-card.added-flash {
+    animation: cardAdded 0.6s ease;
+  }
+  @keyframes cardAdded {
+    0% { transform: scale(0.8); opacity: 0; box-shadow: 0 0 40px rgba(0, 240, 255, 0.8); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .btn {
+    padding: 8px 14px; font-size: 11px;
+    font-family: "Orbitron", monospace; letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.06);
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    transition: all 0.2s;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .btn:hover {
+    color: #04050d;
+    background: #00f0ff;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+  }
+  .btn.pink { color: #ff00aa; border-color: rgba(255, 0, 170, 0.35); background: rgba(255, 0, 170, 0.06); }
+  .btn.pink:hover { color: #04050d; background: #ff00aa; box-shadow: 0 0 20px rgba(255, 0, 170, 0.6); }
+  .btn.active { color: #04050d; background: #00f0ff; box-shadow: 0 0 20px rgba(0, 240, 255, 0.6); }
+
+  /* ============================================================
+     城市卡片网格 + 拖拽
+     ============================================================ */
+  .city-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+    margin-bottom: 32px;
+    position: relative;
+    z-index: 1;
+  }
+  .city-grid.dragging { cursor: grabbing; }
+
+  /* 卡片本体 */
+  .city-card {
+    position: relative;
+    padding: 16px 18px 18px;
+    cursor: grab;
+    user-select: none;
+    background: linear-gradient(160deg, rgba(10, 18, 42, 0.85), rgba(28, 6, 48, 0.7));
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    box-shadow:
+      0 0 24px rgba(0, 240, 255, 0.12),
+      inset 0 0 30px rgba(0, 240, 255, 0.04);
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.3s, border-color 0.3s, opacity 0.3s;
+    opacity: 0;
+    animation: cardIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .city-card:nth-child(1) { animation-delay: 0.05s; }
+  .city-card:nth-child(2) { animation-delay: 0.12s; }
+  .city-card:nth-child(3) { animation-delay: 0.19s; }
+  .city-card:nth-child(4) { animation-delay: 0.26s; }
+  .city-card:nth-child(5) { animation-delay: 0.33s; }
+  .city-card:nth-child(6) { animation-delay: 0.40s; }
+
+  /* 卡片四角装饰 */
+  .city-card::before, .city-card::after {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    border: 1px solid #00f0ff;
+    box-shadow: 0 0 6px #00f0ff;
+    pointer-events: none;
+  }
+  .city-card::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .city-card::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  /* 扫描线纹理 */
+  .city-card .scan {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(0, 240, 255, 0.04) 2px,
+      rgba(0, 240, 255, 0.04) 3px
+    );
+    pointer-events: none;
+    border-radius: 0;
+  }
+
+  /* 顶部条带 */
+  .city-card .barcode {
+    position: absolute; top: 6px; right: 18px;
+    display: flex; gap: 2px; height: 4px; opacity: 0.5;
+  }
+  .city-card .barcode span {
+    width: 2px; background: #00f0ff;
+    box-shadow: 0 0 4px #00f0ff;
+  }
+  .city-card .barcode span:nth-child(2n) { width: 1px; }
+  .city-card .barcode span:nth-child(3n) { width: 3px; }
+
+  /* Hover */
+  .city-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(0, 240, 255, 0.6);
+    box-shadow:
+      0 0 32px rgba(0, 240, 255, 0.3),
+      0 8px 24px rgba(0, 0, 0, 0.4),
+      inset 0 0 30px rgba(0, 240, 255, 0.06);
+  }
+
+  /* 拖拽中 - 全息悬浮 */
+  .city-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    transform: scale(0.98) rotate(-1deg);
+  }
+  .city-card.drag-over {
+    border-color: #ff00aa;
+    box-shadow:
+      0 0 32px rgba(255, 0, 170, 0.5),
+      inset 0 0 30px rgba(255, 0, 170, 0.1);
+  }
+
+  /* 拖拽时的幻影 placeholder */
+  .drag-ghost {
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+    width: 280px;
+    padding: 16px 18px 18px;
+    background: linear-gradient(160deg, rgba(0, 240, 255, 0.15), rgba(255, 0, 170, 0.15));
+    border: 1px solid #00f0ff;
+    box-shadow:
+      0 0 40px rgba(0, 240, 255, 0.6),
+      0 0 60px rgba(255, 0, 170, 0.4),
+      inset 0 0 40px rgba(0, 240, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    transform: translate(-50%, -50%) rotate(-2deg) scale(1.05);
+    transition: none;
+  }
+  .drag-ghost::before, .drag-ghost::after {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    border: 1px solid #ff00aa; box-shadow: 0 0 8px #ff00aa;
+  }
+  .drag-ghost::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .drag-ghost::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+  .drag-ghost::after .scan { display: block; }
+
+  /* 卡片头部 */
+  .card-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 12px; gap: 10px;
+  }
+  .card-loc { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .card-loc .name {
+    font-size: 15px; font-weight: 600; color: #fff;
+    letter-spacing: 0.05em; text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  }
+  .card-loc .meta {
+    font-size: 10px; color: #6b8fa3;
+    font-family: "Orbitron", monospace; letter-spacing: 0.1em;
+  }
+  .card-loc .meta .dot { color: #ff00aa; margin: 0 4px; }
+  .drag-handle {
+    width: 18px; height: 18px; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; gap: 2px;
+    opacity: 0.4; transition: opacity 0.2s;
+  }
+  .drag-handle span {
+    display: flex; gap: 2px;
+  }
+  .drag-handle span::before, .drag-handle span::after {
+    content: ''; width: 3px; height: 3px; background: #00f0ff;
+    box-shadow: 0 0 4px #00f0ff;
+  }
+  .city-card:hover .drag-handle { opacity: 0.8; }
+
+  /* 主体温度 + HUD 数据 */
+  .card-body {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    align-items: center; margin-bottom: 14px;
+  }
+  .temp-block {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .temp-block .now {
+    font-family: "Orbitron", monospace;
+    font-size: 44px; font-weight: 700; line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 16px rgba(0, 240, 255, 0.7);
+    letter-spacing: -0.02em;
+  }
+  .temp-block .unit { font-size: 18px; color: #00f0ff; font-weight: 400; }
+  .temp-block .desc {
+    font-size: 11px; color: #88c4d9; margin-top: 4px;
+    font-family: "Orbitron", monospace; letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .weather-icon {
+    width: 64px; height: 64px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px;
+    background: radial-gradient(circle, rgba(0, 240, 255, 0.15), transparent 70%);
+    border-radius: 50%;
+    align-self: center; justify-self: end;
+    filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.5));
+  }
+
+  /* HUD 数据网格 */
+  .hud-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(0, 240, 255, 0.2);
+  }
+  .hud-item {
+    position: relative;
+    padding: 8px 10px;
+    background: rgba(0, 240, 255, 0.04);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .hud-item::before {
+    content: ''; position: absolute; top: 0; left: 0; width: 8px; height: 1px;
+    background: #ff00aa; box-shadow: 0 0 4px #ff00aa;
+  }
+  .hud-item .lbl {
+    font-size: 9px; color: #6b8fa3;
+    font-family: "Orbitron", monospace; letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .hud-item .val {
+    font-size: 14px; font-weight: 600; color: #fff;
+    font-family: "Orbitron", monospace;
+    text-shadow: 0 0 4px rgba(0, 240, 255, 0.4);
+  }
+  .hud-item .val .u { font-size: 9px; color: #6b8fa3; font-weight: 400; margin-left: 2px; }
+
+  /* 微图表行 */
+  .micro-charts {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px dashed rgba(0, 240, 255, 0.2);
+  }
+  .ring-wrap { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
+  .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: rgba(0, 240, 255, 0.15); stroke-width: 3; }
+  .ring-fg { fill: none; stroke: url(#cyanGrad); stroke-width: 3; stroke-linecap: round;
+    filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.6));
+    stroke-dasharray: 100; stroke-dashoffset: 100;
+    animation: ringFill 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .ring-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: #fff; font-family: "Orbitron", monospace; font-weight: 600;
+  }
+  @keyframes ringFill { to { stroke-dashoffset: var(--target); } }
+  .micro-info { flex: 1; min-width: 0; }
+  .micro-info .ttl {
+    font-size: 10px; color: #6b8fa3; letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: "Orbitron", monospace;
+  }
+  .micro-info .val { font-size: 13px; color: #fff; font-weight: 600; }
+  .spark { height: 24px; flex: 1; min-width: 60px; }
+
+  /* ============================================================
+     加载骨架
+     ============================================================ */
+  .skeleton {
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.04) 0%, rgba(0, 240, 255, 0.12) 50%, rgba(0, 240, 255, 0.04) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skel-line { height: 12px; margin: 4px 0; border-radius: 2px; }
+  .skel-block { border-radius: 4px; }
+
+  /* ============================================================
+     黄历模块
+     ============================================================ */
+  .almanac {
+    margin-top: 32px;
+    padding: 28px 30px;
+    position: relative;
+    overflow: hidden;
+  }
+  .almanac::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top left, rgba(255, 0, 170, 0.1), transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(0, 240, 255, 0.1), transparent 50%);
+    pointer-events: none;
+  }
+  .alm-head {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+    position: relative;
+  }
+  .alm-head .badge {
+    padding: 4px 10px;
+    font-size: 10px; font-weight: 600;
+    font-family: "Orbitron", monospace; letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #04050d; background: #ff00aa;
+    box-shadow: 0 0 12px rgba(255, 0, 170, 0.6);
+  }
+  .alm-head h2 {
+    font-family: "Orbitron", "STKaiti", "KaiTi", serif;
+    font-size: 24px; font-weight: 700; letter-spacing: 0.1em;
+    background: linear-gradient(90deg, #00f0ff, #ff00aa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .alm-head .sub {
+    margin-left: auto; font-size: 11px; color: #6b8fa3;
+    font-family: "Orbitron", monospace; letter-spacing: 0.1em;
+  }
+
+  .alm-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr;
+    gap: 20px;
+    position: relative;
+  }
+  @media (max-width: 1100px) { .alm-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .alm-grid { grid-template-columns: 1fr; } }
+
+  .alm-cell {
+    position: relative;
+    padding: 16px 18px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    transition: all 0.3s;
+  }
+  .alm-cell:hover {
+    border-color: rgba(255, 0, 170, 0.5);
+    background: rgba(255, 0, 170, 0.05);
+    box-shadow: 0 0 20px rgba(255, 0, 170, 0.2);
+  }
+  .alm-cell::before, .alm-cell::after {
+    content: ''; position: absolute; width: 8px; height: 8px;
+    border: 1px solid #00f0ff;
+  }
+  .alm-cell::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .alm-cell::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  .alm-cell .cell-label {
+    font-size: 10px; color: #6b8fa3;
+    font-family: "Orbitron", monospace; letter-spacing: 0.18em;
+    text-transform: uppercase; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .alm-cell .cell-label::before {
+    content: ''; width: 6px; height: 6px;
+    background: #ff00aa; box-shadow: 0 0 6px #ff00aa;
+  }
+  .alm-cell .cell-value {
+    font-family: "STKaiti", "KaiTi", "楷体", serif;
+    font-size: 22px; font-weight: 700; color: #fff;
+    text-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+    letter-spacing: 0.05em;
+    line-height: 1.3;
+  }
+  .alm-cell .cell-sub {
+    font-size: 11px; color: #88c4d9; margin-top: 4px;
+    font-family: "Orbitron", monospace; letter-spacing: 0.05em;
+  }
+
+  /* 干支纪年 - 大字 */
+  .alm-cell.ganzhi .cell-value {
+    font-size: 36px;
+    background: linear-gradient(90deg, #ff00aa, #00f0ff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+  }
+
+  /* 宜忌 */
+  .yiji {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  .yiji > div { padding: 12px 14px; }
+  .yiji .yi { background: rgba(0, 240, 255, 0.06); border: 1px solid rgba(0, 240, 255, 0.3); }
+  .yiji .ji { background: rgba(255, 0, 170, 0.06); border: 1px solid rgba(255, 0, 170, 0.3); }
+  .yiji .label {
+    font-size: 12px; font-weight: 700; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+    font-family: "STKaiti", "KaiTi", serif;
+  }
+  .yiji .yi .label { color: #00f0ff; text-shadow: 0 0 6px rgba(0, 240, 255, 0.6); }
+  .yiji .ji .label { color: #ff00aa; text-shadow: 0 0 6px rgba(255, 0, 170, 0.6); }
+  .yiji .label::before {
+    content: ''; width: 8px; height: 8px; border-radius: 50%;
+  }
+  .yiji .yi .label::before { background: #00f0ff; box-shadow: 0 0 6px #00f0ff; }
+  .yiji .ji .label::before { background: #ff00aa; box-shadow: 0 0 6px #ff00aa; }
+  .yiji .items {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .yiji .items span {
+    font-size: 12px; padding: 2px 8px;
+    font-family: "STKaiti", "KaiTi", serif;
+  }
+  .yiji .yi .items span { color: #00f0ff; background: rgba(0, 240, 255, 0.1); }
+  .yiji .ji .items span { color: #ff00aa; background: rgba(255, 0, 170, 0.1); }
+
+  /* 生肖运势 - 横向列表 */
+  .shengxiao-grid {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  }
+  @media (max-width: 640px) { .shengxiao-grid { grid-template-columns: repeat(4, 1fr); } }
+  .sx-item {
+    padding: 8px 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    text-align: center;
+    transition: all 0.3s;
+    cursor: default;
+  }
+  .sx-item:hover {
+    transform: translateY(-2px);
+    border-color: #ff00aa;
+    box-shadow: 0 0 12px rgba(255, 0, 170, 0.4);
+  }
+  .sx-item .sx-name {
+    font-family: "STKaiti", "KaiTi", serif;
+    font-size: 14px; font-weight: 700; color: #fff;
+    margin-bottom: 2px;
+  }
+  .sx-item .sx-fortune {
+    font-size: 10px; color: #88c4d9;
+    font-family: "Orbitron", monospace; letter-spacing: 0.05em;
+  }
+  .sx-item[data-luck="大吉"] .sx-fortune,
+  .sx-item[data-luck="吉"] .sx-fortune { color: #00f0ff; text-shadow: 0 0 4px #00f0ff; }
+  .sx-item[data-luck="中"] .sx-fortune { color: #fbbf24; }
+  .sx-item[data-luck="小吉"] .sx-fortune { color: #88c4d9; }
+  .sx-item[data-luck="凶"] .sx-fortune { color: #f87171; }
+
+  /* 节气 */
+  .jieqi-display {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .jieqi-icon {
+    width: 32px; height: 32px;
+    background: radial-gradient(circle, #00f0ff, #b400ff);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+    flex-shrink: 0;
+  }
+  .jieqi-display .jq-text {
+    font-family: "STKaiti", "KaiTi", serif;
+    font-size: 18px; font-weight: 700; color: #fff;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+  }
+  .jieqi-display .jq-days {
+    font-size: 10px; color: #6b8fa3;
+    font-family: "Orbitron", monospace; letter-spacing: 0.05em;
+  }
+
+  /* ============================================================
+     错误提示
+     ============================================================ */
+  .error-banner {
+    padding: 12px 16px; margin-bottom: 16px;
+    background: rgba(255, 0, 170, 0.1);
+    border: 1px solid rgba(255, 0, 170, 0.4);
+    color: #ff80c5; font-size: 13px;
+    display: none;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+  .error-banner.show { display: block; }
+
+  /* ============================================================
+     响应式
+     ============================================================ */
+  @media (max-width: 900px) {
+    .city-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .container { padding: 16px 12px 40px; }
+    .city-grid { grid-template-columns: 1fr; gap: 14px; }
+    .almanac { padding: 20px 16px; }
+    .alm-head h2 { font-size: 18px; }
+    .alm-cell .cell-value { font-size: 18px; }
+    .alm-cell.ganzhi .cell-value { font-size: 28px; }
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .toolbar-search { max-width: 100%; }
+    .modal-panel { padding: 20px 18px; }
+    .modal-temp { font-size: 42px; }
+    .modal-grid { grid-template-columns: repeat(2, 1fr); }
+    header { padding: 14px 16px; }
+    .brand h1 { font-size: 16px; }
+  }
+
+  /* ============================================================
+     减少动画
+     ============================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <!-- SVG defs (复用渐变) -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#00f0ff"/>
+        <stop offset="100%" stop-color="#ff00aa"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <div class="bg-base"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-orb o1"></div>
+  <div class="bg-orb o2"></div>
+  <div class="bg-orb o3"></div>
+  <div class="bg-scanlines"></div>
+
+  <div class="container">
+    <!-- HEADER -->
+    <header class="cyber-panel">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 15a4 4 0 0 1 4-4h.5a5.5 5.5 0 0 1 10.9.5 4 4 0 0 1-1 7.9H7a4 4 0 0 1-4-4z"/>
+            <path d="M12 3l2 3-2 2-2-2 2-3"/>
+            <path d="M19 8l-1 2 2 1 1-2-2-1"/>
+          </svg>
+        </div>
+        <div>
+          <h1>赛博天气 / Cyber Weather</h1>
+          <p>// 神经气象网络 · v3.7.2</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <div class="clock" id="clock">00:00:00</div>
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          <span id="statusText">正在连接神经网...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 工具栏 -->
+    <div class="toolbar cyber-panel">
+      <div class="toolbar-title">
+        <span>城市矩阵</span>
+      </div>
+      <div class="toolbar-search" id="toolbarSearch">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="citySearch" placeholder="搜索城市 (中文/英文)..." autocomplete="off" />
+        <button class="search-clear" id="searchClear" style="display:none">×</button>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn pink" id="resetBtn">⟲ 重置</button>
+        <button class="btn" id="refreshBtn">↻ 刷新</button>
+      </div>
+    </div>
+    <!-- 搜索下拉 (独立于 toolbar, 避免 backdrop-filter 创建新的 containing block) -->
+    <div class="search-dropdown" id="searchDropdown"></div>
+
+    <div id="errorBanner" class="error-banner"></div>
+
+    <!-- 城市卡片网格 -->
+    <div id="cityGrid" class="city-grid"></div>
+
+    <!-- 黄历模块 -->
+    <section id="almanac" class="almanac cyber-panel">
+      <div class="alm-head">
+        <span class="badge">赛博黄历</span>
+        <h2>通玄历 · 老黄历</h2>
+        <div class="sub" id="almDateLabel">--</div>
+      </div>
+      <div class="alm-grid">
+        <!-- 干支纪年 + 节气 -->
+        <div class="alm-cell ganzhi">
+          <div class="cell-label">天干地支 / 纪年</div>
+          <div class="cell-value" id="ganzhi">--</div>
+          <div class="cell-sub" id="ganzhiAnimal">--</div>
+        </div>
+        <div class="alm-cell">
+          <div class="cell-label">农历日期</div>
+          <div class="cell-value" id="lunarDate">--</div>
+          <div class="cell-sub" id="lunarMonth">--</div>
+        </div>
+        <div class="alm-cell">
+          <div class="cell-label">当前节气</div>
+          <div class="jieqi-display">
+            <div class="jieqi-icon" id="jieqiIcon">❄</div>
+            <div>
+              <div class="jq-text" id="jieqiName">--</div>
+              <div class="jq-days" id="jieqiDays">--</div>
+            </div>
+          </div>
+        </div>
+        <div class="alm-cell">
+          <div class="cell-label">五行 / 冲煞</div>
+          <div class="cell-value" id="wuxing" style="font-size:18px">--</div>
+          <div class="cell-sub" id="chongsha">--</div>
+        </div>
+      </div>
+
+      <!-- 宜忌 -->
+      <div style="margin-top:20px">
+        <div class="yiji">
+          <div class="yi">
+            <div class="label">宜 · YI</div>
+            <div class="items" id="yiList"></div>
+          </div>
+          <div class="ji">
+            <div class="label">忌 · JI</div>
+            <div class="items" id="jiList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 生肖运势 -->
+      <div style="margin-top:20px">
+        <div class="cell-label" style="margin-bottom:10px">十二生肖 · 今日运势</div>
+        <div class="shengxiao-grid" id="shengxiaoGrid"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 城市详情模态框 -->
+  <div class="modal-overlay" id="cityModal" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalCityName">
+      <button class="modal-close" id="modalClose" aria-label="关闭">×</button>
+      <div class="modal-header">
+        <div class="modal-icon" id="modalIcon">☀️</div>
+        <div>
+          <h2 class="modal-title" id="modalCityName">--</h2>
+          <div class="modal-subtitle" id="modalCitySub">--</div>
+        </div>
+      </div>
+      <div class="modal-current">
+        <div class="modal-temp"><span id="modalTemp">--</span><span class="modal-temp-unit">°C</span></div>
+        <div class="modal-desc" id="modalDesc">--</div>
+      </div>
+      <div class="modal-grid" id="modalGrid"></div>
+      <div class="modal-section">
+        <div class="modal-section-title">基础信息</div>
+        <div class="modal-info" id="modalInfo"></div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">7 日预报</div>
+        <div class="modal-forecast" id="modalForecast"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn pink" id="modalRemove">⊗ 移除该城市</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主题切换器 (固定右下角) -->
+  <button id="themeToggle" class="theme-toggle" aria-label="切换主题" title="切换主题">
+    <span class="theme-icon-cyber">⚡</span>
+    <span class="theme-icon-ios"></span>
+  </button>
+
+  <!-- 主题切换器样式 -->
+  <style>
+    .theme-toggle {
+      position: fixed; bottom: 24px; right: 24px;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, #00f0ff, #ff00aa);
+      border: 1px solid rgba(0, 240, 255, 0.5);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
+      cursor: pointer; z-index: 999;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.3s, box-shadow 0.3s, background 0.5s;
+      color: #04050d;
+      font-size: 22px;
+    }
+    .theme-toggle:hover { transform: scale(1.08) rotate(15deg); }
+    .theme-toggle .theme-icon-cyber,
+    .theme-toggle .theme-icon-ios { position: absolute; transition: opacity 0.3s, transform 0.4s; }
+    .theme-toggle .theme-icon-ios {
+      width: 22px; height: 22px;
+      background: #fff;
+      mask: radial-gradient(circle at 30% 30%, #000 8%, transparent 9%) no-repeat,
+            radial-gradient(circle at 70% 30%, #000 8%, transparent 9%) no-repeat,
+            radial-gradient(circle at 50% 70%, #000 8%, transparent 9%) no-repeat;
+      -webkit-mask: radial-gradient(circle at 30% 30%, #000 8%, transparent 9%) no-repeat,
+            radial-gradient(circle at 70% 30%, #000 8%, transparent 9%) no-repeat,
+            radial-gradient(circle at 50% 70%, #000 8%, transparent 9%) no-repeat;
+      opacity: 0; transform: scale(0.5);
+    }
+    body:not(.theme-ios) .theme-toggle .theme-icon-cyber { opacity: 1; transform: scale(1); }
+    body:not(.theme-ios) .theme-toggle .theme-icon-ios { opacity: 0; transform: scale(0.5); }
+    body.theme-ios .theme-toggle .theme-icon-cyber { opacity: 0; transform: scale(0.5); }
+    body.theme-ios .theme-toggle .theme-icon-ios { opacity: 1; transform: scale(1); }
+    body.theme-ios .theme-toggle {
+      background: linear-gradient(135deg, #007AFF, #5856D6);
+      border-color: rgba(0, 122, 255, 0.5);
+      box-shadow: 0 0 20px rgba(0, 122, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+  </style>
+
+  <!-- iOS 主题覆盖样式 (通过 body.theme-ios 触发) -->
+  <style id="iosTheme">
+    /* === iOS 主题变量 === */
+    body.theme-ios {
+      --ios-bg-1: #F2F2F7;
+      --ios-bg-2: #FFFFFF;
+      --ios-bg-3: rgba(255, 255, 255, 0.72);
+      --ios-fg-1: #000000;
+      --ios-fg-2: #3C3C43;
+      --ios-fg-3: #8E8E93;
+      --ios-accent: #007AFF;
+      --ios-accent-2: #5856D6;
+      --ios-green: #34C759;
+      --ios-orange: #FF9500;
+      --ios-red: #FF3B30;
+      --ios-separator: rgba(60, 60, 67, 0.12);
+      --ios-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.06);
+      --ios-radius: 16px;
+      color: var(--ios-fg-1);
+      background: var(--ios-bg-1);
+      transition: background 0.5s, color 0.5s;
+    }
+
+    /* iOS 背景: 柔和渐变 + 模糊圆, 无网格扫描线 */
+    body.theme-ios .bg-base {
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(0, 122, 255, 0.08), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(88, 86, 214, 0.08), transparent 60%),
+        linear-gradient(180deg, #F2F2F7 0%, #FAFAFA 100%);
+    }
+    body.theme-ios .bg-grid,
+    body.theme-ios .bg-scanlines { display: none; }
+    body.theme-ios .bg-orb { opacity: 0.15; filter: blur(80px); }
+    body.theme-ios .bg-orb.o1 { background: #007AFF; }
+    body.theme-ios .bg-orb.o2 { background: #5856D6; }
+    body.theme-ios .bg-orb.o3 { background: #FF2D55; }
+
+    /* iOS 通用面板: 圆角 16px + 白色半透明 + 1px 边 */
+    body.theme-ios .cyber-panel {
+      background: var(--ios-bg-3);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 0.5px solid var(--ios-separator);
+      border-radius: var(--ios-radius);
+      clip-path: none;
+      box-shadow: var(--ios-card-shadow);
+    }
+    body.theme-ios .cyber-panel::before,
+    body.theme-ios .cyber-panel::after { display: none; }
+
+    /* iOS Header */
+    body.theme-ios header { padding: 14px 20px; margin-bottom: 20px; }
+    body.theme-ios .brand-mark {
+      background: linear-gradient(135deg, #007AFF, #5856D6);
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
+    }
+    body.theme-ios .brand-mark::before, body.theme-ios .brand-mark::after { display: none; }
+    body.theme-ios .brand-mark svg { filter: none; }
+    body.theme-ios .brand h1 {
+      background: none; -webkit-text-fill-color: var(--ios-fg-1);
+      color: var(--ios-fg-1);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+      font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+      text-transform: none; text-shadow: none;
+    }
+    body.theme-ios .brand p {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    body.theme-ios .clock {
+      color: var(--ios-fg-2); text-shadow: none;
+      font-family: -apple-system, "SF Pro Display", sans-serif;
+      font-size: 14px; font-weight: 500;
+    }
+    body.theme-ios .status-pill {
+      background: rgba(52, 199, 89, 0.12);
+      border: none; color: #248A3D; text-shadow: none;
+      font-family: -apple-system, sans-serif; font-size: 12px;
+      padding: 4px 10px; letter-spacing: 0;
+    }
+    body.theme-ios .status-dot {
+      background: var(--ios-green); box-shadow: none;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* iOS 工具栏 */
+    body.theme-ios .toolbar {
+      background: var(--ios-bg-3);
+      border: 0.5px solid var(--ios-separator);
+      border-radius: var(--ios-radius);
+      padding: 10px 14px;
+      backdrop-filter: blur(20px);
+      box-shadow: var(--ios-card-shadow);
+    }
+    body.theme-ios .toolbar-title {
+      color: var(--ios-fg-1);
+      font-family: -apple-system, sans-serif;
+      font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+      text-transform: none; text-shadow: none;
+    }
+    body.theme-ios .toolbar-title::before { display: none; }
+    body.theme-ios .toolbar-title span { color: var(--ios-fg-3); }
+    body.theme-ios .btn {
+      background: rgba(0, 122, 255, 0.1);
+      border: none; color: var(--ios-accent);
+      border-radius: 8px;
+      clip-path: none;
+      font-family: -apple-system, sans-serif;
+      font-size: 13px; font-weight: 500;
+      letter-spacing: 0; text-transform: none;
+      padding: 6px 12px;
+    }
+    body.theme-ios .btn:hover { background: var(--ios-accent); color: #fff; box-shadow: none; }
+    body.theme-ios .btn.pink { background: rgba(255, 45, 79, 0.1); color: #FF2D55; }
+    body.theme-ios .btn.pink:hover { background: #FF2D55; color: #fff; }
+    body.theme-ios .btn.active { background: var(--ios-accent); color: #fff; }
+
+    /* iOS 城市卡片 */
+    body.theme-ios .city-grid { gap: 12px; }
+    body.theme-ios .city-card {
+      background: #FFFFFF;
+      border: 0.5px solid var(--ios-separator);
+      border-radius: var(--ios-radius);
+      box-shadow: var(--ios-card-shadow);
+      padding: 14px 16px 16px;
+      clip-path: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    body.theme-ios .city-card::before, body.theme-ios .city-card::after { display: none; }
+    body.theme-ios .city-card .scan,
+    body.theme-ios .city-card .barcode { display: none; }
+    body.theme-ios .city-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      border-color: transparent;
+    }
+    body.theme-ios .city-card.dragging {
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+      transform: scale(1.02) rotate(-1deg);
+      opacity: 0.9;
+    }
+    body.theme-ios .city-card.drag-over {
+      border-color: var(--ios-accent);
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+    }
+    body.theme-ios .drag-ghost {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border: 0.5px solid var(--ios-accent);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+      border-radius: var(--ios-radius);
+      clip-path: none;
+      transform: translate(-50%, -50%) rotate(-1deg) scale(1.03);
+    }
+    body.theme-ios .drag-ghost::before, body.theme-ios .drag-ghost::after { display: none; }
+
+    /* iOS 卡片内容 */
+    body.theme-ios .card-loc .name {
+      color: var(--ios-fg-1);
+      text-shadow: none;
+      font-family: -apple-system, sans-serif;
+      font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+    }
+    body.theme-ios .card-loc .meta {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+      letter-spacing: 0;
+    }
+    body.theme-ios .drag-handle span::before, body.theme-ios .drag-handle span::after {
+      background: var(--ios-fg-3); box-shadow: none;
+    }
+    body.theme-ios .temp-block .now {
+      color: var(--ios-fg-1); text-shadow: none;
+      font-family: -apple-system, "SF Pro Display", sans-serif;
+      font-size: 36px; font-weight: 200; letter-spacing: -0.02em;
+    }
+    body.theme-ios .temp-block .unit { color: var(--ios-fg-3); font-size: 16px; }
+    body.theme-ios .temp-block .desc {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+      letter-spacing: 0; text-transform: none;
+    }
+    body.theme-ios .weather-icon {
+      background: rgba(0, 122, 255, 0.08);
+      filter: none;
+    }
+    body.theme-ios .hud-grid {
+      grid-template-columns: repeat(2, 1fr);
+      border-top: 0.5px solid var(--ios-separator);
+      padding-top: 10px;
+    }
+    body.theme-ios .hud-item {
+      background: transparent; border: none;
+      padding: 6px 0;
+    }
+    body.theme-ios .hud-item::before { display: none; }
+    body.theme-ios .hud-item .lbl {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+      font-size: 11px; letter-spacing: 0; text-transform: none;
+    }
+    body.theme-ios .hud-item .val {
+      color: var(--ios-fg-1); text-shadow: none;
+      font-family: -apple-system, "SF Pro Display", sans-serif;
+      font-size: 17px; font-weight: 500;
+    }
+    body.theme-ios .hud-item .val .u { color: var(--ios-fg-3); font-size: 11px; }
+    body.theme-ios .micro-charts {
+      border-top: 0.5px solid var(--ios-separator);
+    }
+    body.theme-ios .ring-bg { stroke: rgba(0, 0, 0, 0.08); }
+    body.theme-ios .ring-fg { stroke: var(--ios-accent); filter: none; }
+    body.theme-ios .ring-label { color: var(--ios-fg-1); font-family: -apple-system, sans-serif; }
+    body.theme-ios .micro-info .ttl {
+      color: var(--ios-fg-3); font-family: -apple-system, sans-serif;
+      letter-spacing: 0; text-transform: none; font-size: 11px;
+    }
+    body.theme-ios .micro-info .val {
+      color: var(--ios-fg-1); font-family: -apple-system, sans-serif;
+      font-size: 14px; font-weight: 500;
+    }
+    body.theme-ios .spark path { stroke: var(--ios-accent); filter: none; }
+    body.theme-ios .spark circle { filter: none; }
+    body.theme-ios .spark defs stop:first-child { stop-color: var(--ios-accent); }
+
+    /* iOS 黄历 */
+    body.theme-ios .almanac {
+      background: #FFFFFF;
+      border: 0.5px solid var(--ios-separator);
+      border-radius: var(--ios-radius);
+      box-shadow: var(--ios-card-shadow);
+      padding: 20px;
+    }
+    body.theme-ios .almanac::before { display: none; }
+    body.theme-ios .alm-head .badge {
+      background: var(--ios-accent); color: #fff;
+      box-shadow: none;
+      border-radius: 6px;
+      font-family: -apple-system, sans-serif;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0; text-transform: none;
+      padding: 3px 8px;
+    }
+    body.theme-ios .alm-head h2 {
+      background: none; -webkit-text-fill-color: var(--ios-fg-1);
+      color: var(--ios-fg-1); text-shadow: none;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      font-size: 20px; font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    body.theme-ios .alm-head .sub {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+      letter-spacing: 0;
+    }
+    body.theme-ios .alm-cell {
+      background: var(--ios-bg-1);
+      border: none;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    body.theme-ios .alm-cell::before, body.theme-ios .alm-cell::after { display: none; }
+    body.theme-ios .alm-cell .cell-label {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+      letter-spacing: 0; text-transform: none;
+      font-size: 12px; margin-bottom: 6px;
+    }
+    body.theme-ios .alm-cell .cell-label::before {
+      background: var(--ios-accent); box-shadow: none;
+      width: 4px; height: 4px; border-radius: 50%;
+    }
+    body.theme-ios .alm-cell .cell-value {
+      color: var(--ios-fg-1); text-shadow: none;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      font-size: 18px; font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    body.theme-ios .alm-cell.ganzhi .cell-value {
+      background: none; -webkit-text-fill-color: var(--ios-fg-1);
+      color: var(--ios-fg-1); font-size: 24px;
+    }
+    body.theme-ios .alm-cell .cell-sub {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+    }
+    body.theme-ios .jieqi-icon {
+      background: linear-gradient(135deg, #007AFF, #5856D6);
+      box-shadow: none;
+      width: 28px; height: 28px; font-size: 14px;
+    }
+    body.theme-ios .jieqi-display .jq-text {
+      color: var(--ios-fg-1); text-shadow: none;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      font-size: 16px; font-weight: 600;
+    }
+    body.theme-ios .jieqi-display .jq-days {
+      color: var(--ios-fg-3);
+      font-family: -apple-system, sans-serif;
+    }
+    body.theme-ios .yiji .yi { background: rgba(52, 199, 89, 0.08); border: none; }
+    body.theme-ios .yiji .ji { background: rgba(255, 59, 48, 0.08); border: none; }
+    body.theme-ios .yiji .yi .label {
+      color: #248A3D; text-shadow: none;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      font-size: 13px;
+    }
+    body.theme-ios .yiji .ji .label {
+      color: #D70015; text-shadow: none;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      font-size: 13px;
+    }
+    body.theme-ios .yiji .yi .label::before { background: #34C759; box-shadow: none; }
+    body.theme-ios .yiji .ji .label::before { background: #FF3B30; box-shadow: none; }
+    body.theme-ios .yiji .items span { font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios .yiji .yi .items span { color: #248A3D; background: rgba(52, 199, 89, 0.12); }
+    body.theme-ios .yiji .ji .items span { color: #D70015; background: rgba(255, 59, 48, 0.12); }
+    body.theme-ios .shengxiao-grid { gap: 8px; }
+    body.theme-ios .sx-item {
+      background: var(--ios-bg-1);
+      border: none;
+      border-radius: 10px;
+    }
+    body.theme-ios .sx-item:hover {
+      transform: translateY(-2px);
+      background: rgba(0, 122, 255, 0.08);
+      box-shadow: none;
+    }
+    body.theme-ios .sx-item .sx-name {
+      color: var(--ios-fg-1);
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      font-size: 13px; font-weight: 600;
+    }
+    body.theme-ios .sx-item .sx-fortune {
+      font-family: -apple-system, sans-serif;
+    }
+    body.theme-ios .sx-item[data-luck="大吉"] .sx-fortune,
+    body.theme-ios .sx-item[data-luck="吉"] .sx-fortune { color: #34C759; text-shadow: none; }
+    body.theme-ios .sx-item[data-luck="中"] .sx-fortune { color: #FF9500; }
+    body.theme-ios .sx-item[data-luck="小吉"] .sx-fortune { color: var(--ios-fg-3); }
+    body.theme-ios .sx-item[data-luck="凶"] .sx-fortune { color: #FF3B30; }
+
+    /* iOS 搜索框 */
+    body.theme-ios .toolbar-search {
+      background: var(--ios-bg-1);
+      border: 0.5px solid var(--ios-separator);
+      box-shadow: none;
+    }
+    body.theme-ios .toolbar-search:focus-within {
+      border-color: transparent;
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+    }
+    body.theme-ios .search-icon { color: var(--ios-fg-3); text-shadow: none; }
+    body.theme-ios #citySearch { color: var(--ios-fg-1); font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios #citySearch::placeholder { color: var(--ios-fg-3); }
+    body.theme-ios .search-clear {
+      background: rgba(0, 0, 0, 0.1); color: var(--ios-fg-3);
+      border: none;
+    }
+    body.theme-ios .search-clear:hover { background: var(--ios-fg-3); color: #fff; }
+    body.theme-ios .search-dropdown {
+      background: rgba(255, 255, 255, 0.95);
+      border: 0.5px solid var(--ios-separator);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      clip-path: none;
+      border-radius: 12px;
+    }
+    body.theme-ios .search-item { border-bottom: 0.5px solid var(--ios-separator); }
+    body.theme-ios .search-item:hover { background: rgba(0, 122, 255, 0.08); }
+    body.theme-ios .search-item .si-flag {
+      background: rgba(0, 122, 255, 0.1); color: var(--ios-accent);
+      border: none; border-radius: 4px;
+      font-family: -apple-system, sans-serif; font-weight: 500;
+    }
+    body.theme-ios .search-item .si-name { color: var(--ios-fg-1); font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios .search-item .si-en { color: var(--ios-fg-3); font-family: -apple-system, sans-serif; }
+    body.theme-ios .search-item .si-country { color: var(--ios-fg-3); font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios .search-item .si-action {
+      background: rgba(0, 122, 255, 0.1); color: var(--ios-accent);
+      border: none; border-radius: 6px;
+      font-family: -apple-system, sans-serif; font-weight: 600;
+    }
+    body.theme-ios .search-item.disabled .si-action { background: rgba(0, 0, 0, 0.05); color: var(--ios-fg-3); }
+
+    /* iOS 模态框 */
+    body.theme-ios .modal-overlay { background: rgba(0, 0, 0, 0.4); }
+    body.theme-ios .modal-panel {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 0.5px solid var(--ios-separator);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      clip-path: none;
+      border-radius: 16px;
+    }
+    body.theme-ios .modal-close {
+      background: rgba(0, 0, 0, 0.05);
+      border: none; color: var(--ios-fg-3);
+    }
+    body.theme-ios .modal-close:hover { background: rgba(0, 0, 0, 0.1); color: var(--ios-fg-1); }
+    body.theme-ios .modal-icon { background: rgba(0, 122, 255, 0.1); box-shadow: none; }
+    body.theme-ios .modal-title { color: var(--ios-fg-1); text-shadow: none; font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios .modal-subtitle { color: var(--ios-fg-3); font-family: -apple-system, sans-serif; }
+    body.theme-ios .modal-current { border-color: var(--ios-separator); }
+    body.theme-ios .modal-temp { color: var(--ios-fg-1); text-shadow: none; font-family: -apple-system, "SF Pro Display", sans-serif; }
+    body.theme-ios .modal-temp-unit { color: var(--ios-fg-3); }
+    body.theme-ios .modal-desc { color: var(--ios-fg-3); font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios .modal-section-title {
+      color: var(--ios-fg-3); font-family: -apple-system, sans-serif;
+      letter-spacing: 0; text-transform: none; font-size: 13px;
+    }
+    body.theme-ios .modal-section-title::before { background: var(--ios-accent); box-shadow: none; }
+    body.theme-ios .modal-info .mi-row { border-bottom: 0.5px solid var(--ios-separator); }
+    body.theme-ios .modal-info .mi-label { color: var(--ios-fg-3); font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios .modal-info .mi-value { color: var(--ios-fg-1); font-family: -apple-system, "PingFang SC", sans-serif; }
+    body.theme-ios .mf-day {
+      background: var(--ios-bg-1);
+      border: none;
+      border-radius: 10px;
+    }
+    body.theme-ios .mf-day .mf-date { color: var(--ios-fg-3); font-family: -apple-system, sans-serif; }
+    body.theme-ios .mf-day .mf-temp { color: var(--ios-fg-1); font-family: -apple-system, "SF Pro Display", sans-serif; }
+    body.theme-ios .mf-day .mf-temp .lo { color: var(--ios-fg-3); }
+    body.theme-ios .modal-actions { border-top: 0.5px solid var(--ios-separator); }
+    body.theme-ios .remove-btn {
+      background: rgba(255, 59, 48, 0.1);
+      border: none;
+      color: #FF3B30;
+    }
+    body.theme-ios .remove-btn:hover { background: #FF3B30; color: #fff; box-shadow: none; }
+
+    /* iOS 错误提示 */
+    body.theme-ios .error-banner {
+      background: rgba(255, 59, 48, 0.08);
+      border: none;
+      color: #D70015;
+      border-radius: 12px;
+      clip-path: none;
+      font-family: -apple-system, sans-serif;
+    }
+
+    /* iOS 骨架 */
+    body.theme-ios .skeleton {
+      background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 0%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 100%);
+      background-size: 200% 100%;
+    }
+
+    /* iOS 切换动画 */
+    body.theme-ios * { transition: background 0.4s, color 0.4s, border-color 0.4s, box-shadow 0.4s !important; }
+  </style>
+
+<script>
+/* ============================================================
+   工具函数
+   ============================================================ */
+const $ = (s) => document.querySelector(s);
+const fmt = (n, d = 0) => Number(n).toFixed(d);
+
+const WMO_MAP = {
+  0:  { d: '晴',           i: '☀️' },
+  1:  { d: '基本晴朗',     i: '🌤️' },
+  2:  { d: '局部多云',     i: '⛅' },
+  3:  { d: '阴',           i: '☁️' },
+  45: { d: '雾',           i: '🌫️' },
+  48: { d: '冻雾',         i: '🌫️' },
+  51: { d: '毛毛雨',       i: '🌦️' },
+  53: { d: '毛毛雨',       i: '🌦️' },
+  55: { d: '浓毛毛雨',     i: '🌧️' },
+  61: { d: '小雨',         i: '🌧️' },
+  63: { d: '中雨',         i: '🌧️' },
+  65: { d: '大雨',         i: '🌧️' },
+  71: { d: '小雪',         i: '🌨️' },
+  73: { d: '中雪',         i: '❄️' },
+  75: { d: '大雪',         i: '❄️' },
+  77: { d: '雪粒',         i: '🌨️' },
+  80: { d: '阵雨',         i: '🌦️' },
+  81: { d: '强阵雨',       i: '🌧️' },
+  82: { d: '暴阵雨',       i: '⛈️' },
+  85: { d: '阵雪',         i: '🌨️' },
+  86: { d: '强阵雪',       i: '❄️' },
+  95: { d: '雷暴',         i: '⛈️' },
+  96: { d: '雷暴冰雹',     i: '⛈️' },
+  99: { d: '强雷暴冰雹',   i: '⛈️' },
+};
+const wmoDesc = (c) => WMO_MAP[c]?.d || '未知';
+const wmoIcon = (c) => WMO_MAP[c]?.i || '🌡️';
+
+const uvLevel = (uv) => {
+  if (uv == null) return { l: '无数据', c: '#88c4d9' };
+  if (uv < 3) return { l: '弱', c: '#4ade80' };
+  if (uv < 6) return { l: '中等', c: '#fbbf24' };
+  if (uv < 8) return { l: '强', c: '#fb923c' };
+  if (uv < 11) return { l: '很强', c: '#f87171' };
+  return { l: '极强', c: '#b400ff' };
+};
+const windDesc = (kmh) => {
+  if (kmh < 5) return '无风';
+  if (kmh < 12) return '微风';
+  if (kmh < 20) return '清风';
+  if (kmh < 30) return '和风';
+  if (kmh < 40) return '强风';
+  return '大风';
+};
+const aqiLevel = (aqi) => {
+  if (aqi == null) return { l: '无数据', c: '#88c4d9', s: '--' };
+  if (aqi <= 50) return { l: '优', c: '#4ade80', s: 'A' };
+  if (aqi <= 100) return { l: '良', c: '#fbbf24', s: 'B' };
+  if (aqi <= 150) return { l: '轻度污染', c: '#fb923c', s: 'C' };
+  if (aqi <= 200) return { l: '中度污染', c: '#f87171', s: 'D' };
+  if (aqi <= 300) return { l: '重度污染', c: '#dc2626', s: 'E' };
+  return { l: '严重污染', c: '#b400ff', s: 'F' };
+};
+
+/* ============================================================
+   城市数据库 (扩展 - 包含国家/人口/时区)
+   ============================================================ */
+const CITY_DB = [
+  // 中国主要城市
+  { id: 'beijing',  name: '北京',   nameEn: 'Beijing',    lat: 39.9042, lon: 116.4074, country: '中国',   countryEn: 'CN', population: 21893095,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shanghai', name: '上海',   nameEn: 'Shanghai',   lat: 31.2304, lon: 121.4737, country: '中国',   countryEn: 'CN', population: 24870895,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guangzhou',name: '广州',   nameEn: 'Guangzhou',  lat: 23.1291, lon: 113.2644, country: '中国',   countryEn: 'CN', population: 18676605,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shenzhen', name: '深圳',   nameEn: 'Shenzhen',   lat: 22.5431, lon: 114.0579, country: '中国',   countryEn: 'CN', population: 17562800,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chengdu',  name: '成都',   nameEn: 'Chengdu',    lat: 30.5728, lon: 104.0668, country: '中国',   countryEn: 'CN', population: 21228700,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hangzhou', name: '杭州',   nameEn: 'Hangzhou',   lat: 30.2741, lon: 120.1551, country: '中国',   countryEn: 'CN', population: 12524700,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'tianjin',  name: '天津',   nameEn: 'Tianjin',    lat: 39.0842, lon: 117.2009, country: '中国',   countryEn: 'CN', population: 13860000,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wuhan',    name: '武汉',   nameEn: 'Wuhan',      lat: 30.5928, lon: 114.3055, country: '中国',   countryEn: 'CN', population: 13720000,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xian',     name: '西安',   nameEn: 'Xi\'an',     lat: 34.3416, lon: 108.9398, country: '中国',   countryEn: 'CN', population: 13162900,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nanjing',  name: '南京',   nameEn: 'Nanjing',    lat: 32.0603, lon: 118.7969, country: '中国',   countryEn: 'CN', population: 9424370,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chongqing',name: '重庆',   nameEn: 'Chongqing',  lat: 29.4316, lon: 106.9123, country: '中国',   countryEn: 'CN', population: 32054159,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'suzhou',   name: '苏州',   nameEn: 'Suzhou',     lat: 31.2989, lon: 120.5853, country: '中国',   countryEn: 'CN', population: 12958000,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qingdao',  name: '青岛',   nameEn: 'Qingdao',    lat: 36.0671, lon: 120.3826, country: '中国',   countryEn: 'CN', population: 9046200,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'dalian',   name: '大连',   nameEn: 'Dalian',     lat: 38.9140, lon: 121.6147, country: '中国',   countryEn: 'CN', population: 7450000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xiamen',   name: '厦门',   nameEn: 'Xiamen',     lat: 24.4798, lon: 118.0894, country: '中国',   countryEn: 'CN', population: 5280000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'kunming',  name: '昆明',   nameEn: 'Kunming',    lat: 24.8801, lon: 102.8329, country: '中国',   countryEn: 'CN', population: 8460000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'harbin',   name: '哈尔滨', nameEn: 'Harbin',     lat: 45.8038, lon: 126.5350, country: '中国',   countryEn: 'CN', population: 10098000,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'lhasa',    name: '拉萨',   nameEn: 'Lhasa',      lat: 29.6500, lon: 91.1700,  country: '中国',   countryEn: 'CN', population: 559000,    timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hongkong', name: '香港',   nameEn: 'Hong Kong',  lat: 22.3193, lon: 114.1694, country: '中国',   countryEn: 'CN', population: 7482500,   timezone: 'Asia/Hong_Kong (UTC+8)' },
+  { id: 'macao',    name: '澳门',   nameEn: 'Macao',      lat: 22.1987, lon: 113.5439, country: '中国',   countryEn: 'CN', population: 681000,    timezone: 'Asia/Macau (UTC+8)' },
+  { id: 'taipei',   name: '台北',   nameEn: 'Taipei',     lat: 25.0330, lon: 121.5654, country: '中国',   countryEn: 'CN', population: 2646000,   timezone: 'Asia/Taipei (UTC+8)' },
+  // 亚洲
+  { id: 'tokyo',    name: '东京',   nameEn: 'Tokyo',      lat: 35.6762, lon: 139.6503, country: '日本',   countryEn: 'JP', population: 13929286,  timezone: 'Asia/Tokyo (UTC+9)' },
+  { id: 'osaka',    name: '大阪',   nameEn: 'Osaka',      lat: 34.6937, lon: 135.5023, country: '日本',   countryEn: 'JP', population: 2691185,   timezone: 'Asia/Tokyo (UTC+9)' },
+  { id: 'kyoto',    name: '京都',   nameEn: 'Kyoto',      lat: 35.0116, lon: 135.7681, country: '日本',   countryEn: 'JP', population: 1465000,   timezone: 'Asia/Tokyo (UTC+9)' },
+  { id: 'seoul',    name: '首尔',   nameEn: 'Seoul',      lat: 37.5665, lon: 126.9780, country: '韩国',   countryEn: 'KR', population: 9776000,   timezone: 'Asia/Seoul (UTC+9)' },
+  { id: 'singapore',name: '新加坡', nameEn: 'Singapore',  lat: 1.3521,  lon: 103.8198, country: '新加坡', countryEn: 'SG', population: 5685800,   timezone: 'Asia/Singapore (UTC+8)' },
+  { id: 'bangkok',  name: '曼谷',   nameEn: 'Bangkok',    lat: 13.7563, lon: 100.5018, country: '泰国',   countryEn: 'TH', population: 10539000,  timezone: 'Asia/Bangkok (UTC+7)' },
+  { id: 'dubai',    name: '迪拜',   nameEn: 'Dubai',      lat: 25.2048, lon: 55.2708,  country: '阿联酋', countryEn: 'AE', population: 3331420,   timezone: 'Asia/Dubai (UTC+4)' },
+  { id: 'mumbai',   name: '孟买',   nameEn: 'Mumbai',     lat: 19.0760, lon: 72.8777,  country: '印度',   countryEn: 'IN', population: 20961000,  timezone: 'Asia/Kolkata (UTC+5:30)' },
+  // 欧洲
+  { id: 'london',   name: '伦敦',   nameEn: 'London',     lat: 51.5074, lon: -0.1278,  country: '英国',   countryEn: 'GB', population: 9546000,   timezone: 'Europe/London (UTC+0)' },
+  { id: 'paris',    name: '巴黎',   nameEn: 'Paris',      lat: 48.8566, lon: 2.3522,   country: '法国',   countryEn: 'FR', population: 2161000,   timezone: 'Europe/Paris (UTC+1)' },
+  { id: 'berlin',   name: '柏林',   nameEn: 'Berlin',     lat: 52.5200, lon: 13.4050,  country: '德国',   countryEn: 'DE', population: 3645000,   timezone: 'Europe/Berlin (UTC+1)' },
+  { id: 'madrid',   name: '马德里', nameEn: 'Madrid',     lat: 40.4168, lon: -3.7038,  country: '西班牙', countryEn: 'ES', population: 3223000,   timezone: 'Europe/Madrid (UTC+1)' },
+  { id: 'rome',     name: '罗马',   nameEn: 'Rome',       lat: 41.9028, lon: 12.4964,  country: '意大利', countryEn: 'IT', population: 2873000,   timezone: 'Europe/Rome (UTC+1)' },
+  { id: 'amsterdam',name: '阿姆斯特丹', nameEn: 'Amsterdam', lat: 52.3676, lon: 4.9041,  country: '荷兰', countryEn: 'NL', population: 1166000,   timezone: 'Europe/Amsterdam (UTC+1)' },
+  { id: 'moscow',   name: '莫斯科', nameEn: 'Moscow',     lat: 55.7558, lon: 37.6173,  country: '俄罗斯', countryEn: 'RU', population: 12506000,  timezone: 'Europe/Moscow (UTC+3)' },
+  { id: 'stockholm',name: '斯德哥尔摩', nameEn: 'Stockholm', lat: 59.3293, lon: 18.0686, country: '瑞典', countryEn: 'SE', population: 975000,    timezone: 'Europe/Stockholm (UTC+1)' },
+  // 美洲
+  { id: 'newyork',  name: '纽约',   nameEn: 'New York',   lat: 40.7128, lon: -74.0060, country: '美国',   countryEn: 'US', population: 8467513,   timezone: 'America/New_York (UTC-5)' },
+  { id: 'losangeles',name: '洛杉矶',nameEn: 'Los Angeles',lat: 34.0522, lon: -118.2437,country: '美国',   countryEn: 'US', population: 3849297,   timezone: 'America/Los_Angeles (UTC-8)' },
+  { id: 'chicago',  name: '芝加哥', nameEn: 'Chicago',    lat: 41.8781, lon: -87.6298, country: '美国',   countryEn: 'US', population: 2696555,   timezone: 'America/Chicago (UTC-6)' },
+  { id: 'sanfrancisco',name:'旧金山',nameEn: 'San Francisco', lat: 37.7749, lon: -122.4194, country: '美国', countryEn: 'US', population: 805000,  timezone: 'America/Los_Angeles (UTC-8)' },
+  { id: 'toronto',  name: '多伦多', nameEn: 'Toronto',    lat: 43.6532, lon: -79.3832, country: '加拿大', countryEn: 'CA', population: 2731571,   timezone: 'America/Toronto (UTC-5)' },
+  { id: 'vancouver',name: '温哥华', nameEn: 'Vancouver',  lat: 49.2827, lon: -123.1207,country: '加拿大', countryEn: 'CA', population: 631000,    timezone: 'America/Vancouver (UTC-8)' },
+  { id: 'mexicocity',name:'墨西哥城',nameEn: 'Mexico City', lat: 19.4326, lon: -99.1332, country: '墨西哥', countryEn: 'MX', population: 9209944, timezone: 'America/Mexico_City (UTC-6)' },
+  { id: 'saopaulo', name: '圣保罗', nameEn: 'São Paulo',  lat: -23.5505,lon: -46.6333, country: '巴西',   countryEn: 'BR', population: 12325232,  timezone: 'America/Sao_Paulo (UTC-3)' },
+  { id: 'buenosaires',name: '布宜诺斯艾利斯',nameEn: 'Buenos Aires', lat: -34.6037, lon: -58.3816, country: '阿根廷', countryEn: 'AR', population: 3075000, timezone: 'America/Argentina/Buenos_Aires (UTC-3)' },
+  // 大洋洲 / 非洲 / 中东
+  { id: 'sydney',   name: '悉尼',   nameEn: 'Sydney',     lat: -33.8688,lon: 151.2093, country: '澳大利亚', countryEn: 'AU', population: 5312163, timezone: 'Australia/Sydney (UTC+10)' },
+  { id: 'melbourne',name: '墨尔本', nameEn: 'Melbourne',  lat: -37.8136,lon: 144.9631, country: '澳大利亚', countryEn: 'AU', population: 5078193, timezone: 'Australia/Melbourne (UTC+10)' },
+  { id: 'auckland', name: '奥克兰', nameEn: 'Auckland',   lat: -36.8485,lon: 174.7633, country: '新西兰', countryEn: 'NZ', population: 1657200,   timezone: 'Pacific/Auckland (UTC+12)' },
+  { id: 'cairo',    name: '开罗',   nameEn: 'Cairo',      lat: 30.0444, lon: 31.2357,  country: '埃及',   countryEn: 'EG', population: 9540000,   timezone: 'Africa/Cairo (UTC+2)' },
+  { id: 'johannesburg',name:'约翰内斯堡',nameEn: 'Johannesburg', lat: -26.2041, lon: 28.0473, country: '南非', countryEn: 'ZA', population: 5635127, timezone: 'Africa/Johannesburg (UTC+2)' },
+  { id: 'istanbul', name: '伊斯坦布尔', nameEn: 'Istanbul', lat: 41.0082, lon: 28.9784, country: '土耳其', countryEn: 'TR', population: 15462000, timezone: 'Europe/Istanbul (UTC+3)' },
+  { id: 'delhi',    name: '新德里', nameEn: 'Delhi',      lat: 28.6139, lon: 77.2090,  country: '印度',   countryEn: 'IN', population: 32066000,  timezone: 'Asia/Kolkata (UTC+5:30)' },
+  { id: 'bangkok2', name: '清迈',   nameEn: 'Chiang Mai', lat: 18.7883, lon: 98.9853,  country: '泰国',   countryEn: 'TH', population: 1198000,   timezone: 'Asia/Bangkok (UTC+7)' },
+  { id: 'phuket',   name: '普吉',   nameEn: 'Phuket',     lat: 7.8804,  lon: 98.3923,  country: '泰国',   countryEn: 'TH', population: 416000,    timezone: 'Asia/Bangkok (UTC+7)' },
+  { id: 'manila',   name: '马尼拉', nameEn: 'Manila',     lat: 14.5995, lon: 120.9842, country: '菲律宾', countryEn: 'PH', population: 1780000,   timezone: 'Asia/Manila (UTC+8)' },
+  { id: 'jakarta',  name: '雅加达', nameEn: 'Jakarta',    lat: -6.2088, lon: 106.8456, country: '印度尼西亚', countryEn: 'ID', population: 10770000, timezone: 'Asia/Jakarta (UTC+7)' },
+  { id: 'kualalumpur', name: '吉隆坡', nameEn: 'Kuala Lumpur', lat: 3.1390, lon: 101.6869, country: '马来西亚', countryEn: 'MY', population: 1808000, timezone: 'Asia/Kuala_Lumpur (UTC+8)' },
+  { id: 'hanoi',    name: '河内',   nameEn: 'Hanoi',      lat: 21.0285, lon: 105.8542, country: '越南',   countryEn: 'VN', population: 8054000,   timezone: 'Asia/Ho_Chi_Minh (UTC+7)' },
+  { id: 'saigon',   name: '胡志明市', nameEn: 'Ho Chi Minh City', lat: 10.8231, lon: 106.6297, country: '越南', countryEn: 'VN', population: 9078000, timezone: 'Asia/Ho_Chi_Minh (UTC+7)' },
+  // 中国更多
+  { id: 'shenyang', name: '沈阳',   nameEn: 'Shenyang',   lat: 41.8057, lon: 123.4315, country: '中国',   countryEn: 'CN', population: 7077000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'changchun',name: '长春',   nameEn: 'Changchun',  lat: 43.8868, lon: 125.3245, country: '中国',   countryEn: 'CN', population: 7674000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jinan',    name: '济南',   nameEn: 'Jinan',      lat: 36.6512, lon: 117.1201, country: '中国',   countryEn: 'CN', population: 9200000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhengzhou',name: '郑州',   nameEn: 'Zhengzhou',  lat: 34.7466, lon: 113.6253, country: '中国',   countryEn: 'CN', population: 12600000,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'changsha', name: '长沙',   nameEn: 'Changsha',   lat: 28.2282, lon: 112.9388, country: '中国',   countryEn: 'CN', population: 10240000,  timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'fuzhou',   name: '福州',   nameEn: 'Fuzhou',     lat: 26.0745, lon: 119.2965, country: '中国',   countryEn: 'CN', population: 8290000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guiyang',  name: '贵阳',   nameEn: 'Guiyang',    lat: 26.6470, lon: 106.6302, country: '中国',   countryEn: 'CN', population: 5987000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'haikou',   name: '海口',   nameEn: 'Haikou',     lat: 20.0444, lon: 110.1990, country: '中国',   countryEn: 'CN', population: 2873000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'sanya',    name: '三亚',   nameEn: 'Sanya',      lat: 18.2528, lon: 109.5119, country: '中国',   countryEn: 'CN', population: 1031000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'lanzhou',  name: '兰州',   nameEn: 'Lanzhou',    lat: 36.0611, lon: 103.8343, country: '中国',   countryEn: 'CN', population: 4359000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yinchuan', name: '银川',   nameEn: 'Yinchuan',   lat: 38.4872, lon: 106.2309, country: '中国',   countryEn: 'CN', population: 2859000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xining',   name: '西宁',   nameEn: 'Xining',     lat: 36.6232, lon: 101.7804, country: '中国',   countryEn: 'CN', population: 2468000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'urumqi',   name: '乌鲁木齐', nameEn: 'Urumqi',   lat: 43.8256, lon: 87.6168,  country: '中国',   countryEn: 'CN', population: 4054000,   timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'hohhot',   name: '呼和浩特', nameEn: 'Hohhot',  lat: 40.8425, lon: 111.7490, country: '中国',   countryEn: 'CN', population: 2873000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'taiyuan',  name: '太原',   nameEn: 'Taiyuan',    lat: 37.8706, lon: 112.5489, country: '中国',   countryEn: 'CN', population: 5304000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shijiazhuang', name: '石家庄', nameEn: 'Shijiazhuang', lat: 38.0428, lon: 114.5149, country: '中国', countryEn: 'CN', population: 11235000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hefei',    name: '合肥',   nameEn: 'Hefei',      lat: 31.8206, lon: 117.2272, country: '中国',   countryEn: 'CN', population: 9369000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nanchang', name: '南昌',   nameEn: 'Nanchang',   lat: 28.6820, lon: 115.8579, country: '中国',   countryEn: 'CN', population: 6255000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'fushun',   name: '无锡',   nameEn: 'Wuxi',       lat: 31.4912, lon: 120.3119, country: '中国',   countryEn: 'CN', population: 7495000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ningbo',   name: '宁波',   nameEn: 'Ningbo',     lat: 29.8683, lon: 121.5440, country: '中国',   countryEn: 'CN', population: 9697000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wenzhou',  name: '温州',   nameEn: 'Wenzhou',    lat: 27.9938, lon: 120.6993, country: '中国',   countryEn: 'CN', population: 9679000,   timezone: 'Asia/Shanghai (UTC+8)' },
+  // 欧洲更多
+  { id: 'vienna',   name: '维也纳', nameEn: 'Vienna',     lat: 48.2082, lon: 16.3738,  country: '奥地利', countryEn: 'AT', population: 1930000,   timezone: 'Europe/Vienna (UTC+1)' },
+  { id: 'zurich',   name: '苏黎世', nameEn: 'Zurich',     lat: 47.3769, lon: 8.5417,   country: '瑞士',   countryEn: 'CH', population: 415000,    timezone: 'Europe/Zurich (UTC+1)' },
+  { id: 'prague',   name: '布拉格', nameEn: 'Prague',     lat: 50.0755, lon: 14.4378,  country: '捷克',   countryEn: 'CZ', population: 1335000,   timezone: 'Europe/Prague (UTC+1)' },
+  { id: 'athens',   name: '雅典',   nameEn: 'Athens',     lat: 37.9838, lon: 23.7275,  country: '希腊',   countryEn: 'GR', population: 664000,    timezone: 'Europe/Athens (UTC+2)' },
+  { id: 'lisbon',   name: '里斯本', nameEn: 'Lisbon',     lat: 38.7223, lon: -9.1393,  country: '葡萄牙', countryEn: 'PT', population: 545000,    timezone: 'Europe/Lisbon (UTC+0)' },
+  { id: 'copenhagen',name: '哥本哈根', nameEn: 'Copenhagen', lat: 55.6761, lon: 12.5683, country: '丹麦', countryEn: 'DK', population: 1346000,   timezone: 'Europe/Copenhagen (UTC+1)' },
+  { id: 'oslo',     name: '奥斯陆', nameEn: 'Oslo',       lat: 59.9139, lon: 10.7522,  country: '挪威',   countryEn: 'NO', population: 697000,    timezone: 'Europe/Oslo (UTC+1)' },
+  { id: 'helsinki', name: '赫尔辛基', nameEn: 'Helsinki', lat: 60.1699, lon: 24.9384,  country: '芬兰',   countryEn: 'FI', population: 656000,    timezone: 'Europe/Helsinki (UTC+2)' },
+  // 美洲更多
+  { id: 'washington',name: '华盛顿', nameEn: 'Washington', lat: 38.9072, lon: -77.0369, country: '美国', countryEn: 'US', population: 671000,  timezone: 'America/New_York (UTC-5)' },
+  { id: 'boston',   name: '波士顿', nameEn: 'Boston',     lat: 42.3601, lon: -71.0589, country: '美国',   countryEn: 'US', population: 692000,    timezone: 'America/New_York (UTC-5)' },
+  { id: 'seattle',  name: '西雅图', nameEn: 'Seattle',    lat: 47.6062, lon: -122.3321,country: '美国',   countryEn: 'US', population: 750000,    timezone: 'America/Los_Angeles (UTC-8)' },
+  { id: 'miami',    name: '迈阿密', nameEn: 'Miami',      lat: 25.7617, lon: -80.1918, country: '美国',   countryEn: 'US', population: 442000,    timezone: 'America/New_York (UTC-5)' },
+  { id: 'honolulu', name: '檀香山', nameEn: 'Honolulu',   lat: 21.3069, lon: -157.8583,country: '美国',  countryEn: 'US', population: 350000,    timezone: 'Pacific/Honolulu (UTC-10)' },
+  { id: 'anchorage',name: '安克雷奇', nameEn: 'Anchorage', lat: 61.2181, lon: -149.9003,country: '美国', countryEn: 'US', population: 288000,   timezone: 'America/Anchorage (UTC-9)' },
+  { id: 'havana',   name: '哈瓦那', nameEn: 'Havana',     lat: 23.1136, lon: -82.3666, country: '古巴',   countryEn: 'CU', population: 2141000,   timezone: 'America/Havana (UTC-5)' },
+  { id: 'lima',     name: '利马',   nameEn: 'Lima',       lat: -12.0464,lon: -77.0428, country: '秘鲁',  countryEn: 'PE', population: 11204000,  timezone: 'America/Lima (UTC-5)' },
+  { id: 'santiago', name: '圣地亚哥', nameEn: 'Santiago', lat: -33.4489,lon: -70.6693, country: '智利',  countryEn: 'CL', population: 6310000,   timezone: 'America/Santiago (UTC-3)' },
+  { id: 'rio',      name: '里约热内卢', nameEn: 'Rio de Janeiro', lat: -22.9068, lon: -43.1729, country: '巴西', countryEn: 'BR', population: 6747000, timezone: 'America/Sao_Paulo (UTC-3)' },
+  { id: 'ottawa',   name: '渥太华', nameEn: 'Ottawa',     lat: 45.4215, lon: -75.6972, country: '加拿大', countryEn: 'CA', population: 1008000,  timezone: 'America/Toronto (UTC-5)' },
+  { id: 'montreal', name: '蒙特利尔', nameEn: 'Montreal', lat: 45.5019, lon: -73.5674, country: '加拿大', countryEn: 'CA', population: 1780000,  timezone: 'America/Toronto (UTC-5)' },
+  { id: 'reykjavik',name: '雷克雅未克', nameEn: 'Reykjavik', lat: 64.1466, lon: -21.9426, country: '冰岛', countryEn: 'IS', population: 131000, timezone: 'Atlantic/Reykjavik (UTC+0)' },
+  // 非洲中东更多
+  { id: 'lagos',    name: '拉各斯', nameEn: 'Lagos',      lat: 6.5244,  lon: 3.3792,   country: '尼日利亚', countryEn: 'NG', population: 14862000, timezone: 'Africa/Lagos (UTC+1)' },
+  { id: 'nairobi',  name: '内罗毕', nameEn: 'Nairobi',    lat: -1.2921, lon: 36.8219,  country: '肯尼亚', countryEn: 'KE', population: 4397000,  timezone: 'Africa/Nairobi (UTC+3)' },
+  { id: 'casablanca',name: '卡萨布兰卡', nameEn: 'Casablanca', lat: 33.5731, lon: -7.5898, country: '摩洛哥', countryEn: 'MA', population: 3725000, timezone: 'Africa/Casablanca (UTC+1)' },
+  { id: 'doha',     name: '多哈',   nameEn: 'Doha',       lat: 25.2854, lon: 51.5310,  country: '卡塔尔', countryEn: 'QA', population: 2382000,  timezone: 'Asia/Qatar (UTC+3)' },
+  { id: 'riyadh',   name: '利雅得', nameEn: 'Riyadh',     lat: 24.7136, lon: 46.6753,  country: '沙特阿拉伯', countryEn: 'SA', population: 7676000, timezone: 'Asia/Riyadh (UTC+3)' },
+  { id: 'tehran',   name: '德黑兰', nameEn: 'Tehran',     lat: 35.6892, lon: 51.3890,  country: '伊朗',   countryEn: 'IR', population: 9259000,  timezone: 'Asia/Tehran (UTC+3:30)' },
+  { id: 'telaviv',  name: '特拉维夫', nameEn: 'Tel Aviv', lat: 32.0853, lon: 34.7818,  country: '以色列', countryEn: 'IL', population: 460000,  timezone: 'Asia/Jerusalem (UTC+2)' },
+  // 其他亚洲
+  { id: 'karachi',  name: '卡拉奇', nameEn: 'Karachi',    lat: 24.8607, lon: 67.0011,  country: '巴基斯坦', countryEn: 'PK', population: 16459000, timezone: 'Asia/Karachi (UTC+5)' },
+  { id: 'dhaka',    name: '达卡',   nameEn: 'Dhaka',      lat: 23.8103, lon: 90.4125,  country: '孟加拉国', countryEn: 'BD', population: 22478000, timezone: 'Asia/Dhaka (UTC+6)' },
+  { id: 'yangon',   name: '仰光',   nameEn: 'Yangon',     lat: 16.8409, lon: 96.1735,  country: '缅甸',   countryEn: 'MM', population: 5160000,  timezone: 'Asia/Yangon (UTC+6:30)' },
+  { id: 'phnompenh',name: '金边',   nameEn: 'Phnom Penh', lat: 11.5564, lon: 104.9282, country: '柬埔寨', countryEn: 'KH', population: 2129000, timezone: 'Asia/Phnom_Penh (UTC+7)' },
+  { id: 'ulaanbaatar',name:'乌兰巴托',nameEn: 'Ulaanbaatar', lat: 47.8864, lon: 106.9057, country: '蒙古', countryEn: 'MN', population: 1645000, timezone: 'Asia/Ulaanbaatar (UTC+8)' },
+  { id: 'sf',         name: '旧金山', nameEn: 'San Francisco', lat: 37.7749, lon: -122.4194, country: '美国', countryEn: 'US', population: 805000, timezone: 'America/Los_Angeles (UTC-8)', aliases: ['SF', 'sf', '三藩市', '圣弗朗西斯科'] },
+  { id: 'nyc',        name: '纽约',   nameEn: 'New York',     lat: 40.7128, lon: -74.0060,  country: '美国', countryEn: 'US', population: 8467513, timezone: 'America/New_York (UTC-5)', aliases: ['NYC', 'nyc', 'Ny', 'NY', 'NewYork', 'newyork', 'New York City'] },
+  { id: 'la',         name: '洛杉矶', nameEn: 'Los Angeles',  lat: 34.0522, lon: -118.2437, country: '美国', countryEn: 'US', population: 3849297, timezone: 'America/Los_Angeles (UTC-8)', aliases: ['LA', 'la', 'Los', '洛城'] },
+  { id: 'hk',         name: '香港',   nameEn: 'Hong Kong',    lat: 22.3193, lon: 114.1694,  country: '中国', countryEn: 'CN', population: 7482500, timezone: 'Asia/Hong_Kong (UTC+8)', aliases: ['HK', 'hk', 'Hongkong', 'hongkong', 'HongKong', 'Hong Kong SAR'] },
+  { id: 'tw',         name: '台北',   nameEn: 'Taipei',       lat: 25.0330, lon: 121.5654,  country: '中国', countryEn: 'CN', population: 2646000, timezone: 'Asia/Taipei (UTC+8)', aliases: ['TW', 'tw', 'Taipei City', 'taipei', '臺北'] },
+  { id: 'jp',         name: '东京',   nameEn: 'Tokyo',        lat: 35.6762, lon: 139.6503,  country: '日本', countryEn: 'JP', population: 13929286, timezone: 'Asia/Tokyo (UTC+9)', aliases: ['tokyo', 'Tokyo', '東京', 'とうきょう'] },
+  { id: 'uk',         name: '伦敦',   nameEn: 'London',       lat: 51.5074, lon: -0.1278,   country: '英国', countryEn: 'GB', population: 9546000, timezone: 'Europe/London (UTC+0)', aliases: ['UK', 'london', 'Londres', 'LDN', '伦敦市'] },
+  { id: 'sh',         name: '上海',   nameEn: 'Shanghai',     lat: 31.2304, lon: 121.4737,  country: '中国', countryEn: 'CN', population: 24870895, timezone: 'Asia/Shanghai (UTC+8)', aliases: ['SH', '沪', '申', 'Shanghai City'] },
+  { id: 'bj',         name: '北京',   nameEn: 'Beijing',      lat: 39.9042, lon: 116.4074,  country: '中国', countryEn: 'CN', population: 21893095, timezone: 'Asia/Shanghai (UTC+8)', aliases: ['BJ', '京', 'Peking', '北平', 'Beijing City'] },
+  // 东北地区补充 (地级市)
+  { id: 'jiamusi',    name: '佳木斯', nameEn: 'Jiamusi',      lat: 46.7997, lon: 130.3186, country: '中国', countryEn: 'CN', population: 2333000, timezone: 'Asia/Shanghai (UTC+8)', aliases: ['佳市'] },
+  { id: 'qiqihaer',   name: '齐齐哈尔', nameEn: 'Qiqihar',    lat: 47.3543, lon: 123.9182, country: '中国', countryEn: 'CN', population: 4067000, timezone: 'Asia/Shanghai (UTC+8)', aliases: ['齐市', '齐齐'] },
+  { id: 'daqing',     name: '大庆',   nameEn: 'Daqing',       lat: 46.5897, lon: 125.1038, country: '中国', countryEn: 'CN', population: 2782000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'mudanjiang', name: '牡丹江', nameEn: 'Mudanjiang',  lat: 44.5826, lon: 129.6086, country: '中国', countryEn: 'CN', population: 2295000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yingkou',    name: '营口',   nameEn: 'Yingkou',      lat: 40.6675, lon: 122.2348, country: '中国', countryEn: 'CN', population: 2320000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'anshan',     name: '鞍山',   nameEn: 'Anshan',       lat: 41.1085, lon: 122.9947, country: '中国', countryEn: 'CN', population: 3325000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'fushun',     name: '抚顺',   nameEn: 'Fushun',       lat: 41.8806, lon: 123.9572, country: '中国', countryEn: 'CN', population: 1861000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'benxi',      name: '本溪',   nameEn: 'Benxi',        lat: 41.2864, lon: 123.7651, country: '中国', countryEn: 'CN', population: 1326000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'liaoyang',   name: '辽阳',   nameEn: 'Liaoyang',     lat: 41.2692, lon: 123.1735, country: '中国', countryEn: 'CN', population: 1604000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'panjin',     name: '盘锦',   nameEn: 'Panjin',       lat: 41.1245, lon: 122.0707, country: '中国', countryEn: 'CN', population: 1391000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jinzhou',    name: '锦州',   nameEn: 'Jinzhou',      lat: 41.0954, lon: 121.1417, country: '中国', countryEn: 'CN', population: 2705000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huludao',    name: '葫芦岛', nameEn: 'Huludao',      lat: 40.7110, lon: 120.8366, country: '中国', countryEn: 'CN', population: 2434000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'tieling',    name: '铁岭',   nameEn: 'Tieling',      lat: 42.2236, lon: 123.7256, country: '中国', countryEn: 'CN', population: 2388000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chaoyang',    name: '朝阳',   nameEn: 'Chaoyang',     lat: 41.5763, lon: 120.4509, country: '中国', countryEn: 'CN', population: 2873000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'fuxin',      name: '阜新',   nameEn: 'Fuxin',        lat: 42.0119, lon: 121.6588, country: '中国', countryEn: 'CN', population: 1645000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yanbian',    name: '延吉',   nameEn: 'Yanji',        lat: 42.9046, lon: 129.5091, country: '中国', countryEn: 'CN', population: 1023000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'tonghua',    name: '通化',   nameEn: 'Tonghua',      lat: 41.7212, lon: 125.9395, country: '中国', countryEn: 'CN', population: 1746000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'baishan',    name: '白山',   nameEn: 'Baishan',      lat: 41.9407, lon: 126.4239, country: '中国', countryEn: 'CN', population: 1152000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'songyuan',   name: '松原',   nameEn: 'Songyuan',     lat: 45.1183, lon: 124.8252, country: '中国', countryEn: 'CN', population: 2253000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'heihe',      name: '黑河',   nameEn: 'Heihe',        lat: 50.2451, lon: 127.5285, country: '中国', countryEn: 'CN', population: 1280000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'suihua',     name: '绥化',   nameEn: 'Suihua',       lat: 46.6374, lon: 126.9696, country: '中国', countryEn: 'CN', population: 3675000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yichun',     name: '伊春',   nameEn: 'Yichun',       lat: 47.7273, lon: 128.8413, country: '中国', countryEn: 'CN', population: 1021000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hegang',     name: '鹤岗',   nameEn: 'Hegang',       lat: 47.3500, lon: 130.2974, country: '中国', countryEn: 'CN', population: 894000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shuangyashan',name: '双鸭山',nameEn: 'Shuangyashan', lat: 46.6463, lon: 131.1591, country: '中国', countryEn: 'CN', population: 1212000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qitaihe',    name: '七台河', nameEn: 'Qitaihe',      lat: 45.7710, lon: 130.9012, country: '中国', countryEn: 'CN', population: 711000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jixi',       name: '鸡西',   nameEn: 'Jixi',         lat: 45.2950, lon: 130.9690, country: '中国', countryEn: 'CN', population: 1502000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 内蒙古补充
+  { id: 'chifeng',    name: '赤峰',   nameEn: 'Chifeng',      lat: 42.2587, lon: 118.8889, country: '中国', countryEn: 'CN', population: 4036000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'tongliao',   name: '通辽',   nameEn: 'Tongliao',     lat: 43.6173, lon: 122.2442, country: '中国', countryEn: 'CN', population: 2853000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ordos',      name: '鄂尔多斯',nameEn: 'Ordos',       lat: 39.6086, lon: 109.7813, country: '中国', countryEn: 'CN', population: 2154000, timezone: 'Asia/Shanghai (UTC+8)', aliases: ['尔多斯', '鄂市'] },
+  { id: 'baotou',     name: '包头',   nameEn: 'Baotou',       lat: 40.6574, lon: 109.8403, country: '中国', countryEn: 'CN', population: 2709000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wuhai',      name: '乌海',   nameEn: 'Wuhai',        lat: 39.6541, lon: 106.7955, country: '中国', countryEn: 'CN', population: 559000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wulanchabu', name: '乌兰察布',nameEn: 'Ulanqab',     lat: 41.0341, lon: 113.1145, country: '中国', countryEn: 'CN', population: 1706000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'bayannur',   name: '巴彦淖尔',nameEn: 'Bayannur',    lat: 40.7574, lon: 107.4163, country: '中国', countryEn: 'CN', population: 1539000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xilinhot',   name: '锡林浩特',nameEn: 'Xilinhot',    lat: 43.9333, lon: 116.0906, country: '中国', countryEn: 'CN', population: 1024000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hulunbeier', name: '呼伦贝尔',nameEn: 'Hulunbuir',   lat: 49.2120, lon: 119.7585, country: '中国', countryEn: 'CN', population: 2245000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 河北/山东/山西补充
+  { id: 'tangshan',   name: '唐山',   nameEn: 'Tangshan',     lat: 39.6308, lon: 118.1804, country: '中国', countryEn: 'CN', population: 7718000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qinhuangdao',name: '秦皇岛',nameEn: 'Qinhuangdao',  lat: 39.9354, lon: 119.6005, country: '中国', countryEn: 'CN', population: 3137000, timezone: 'Asia/Shanghai (UTC+8)', aliases: ['秦市'] },
+  { id: 'handan',     name: '邯郸',   nameEn: 'Handan',       lat: 36.6253, lon: 114.5391, country: '中国', countryEn: 'CN', population: 9414000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xingtai',    name: '邢台',   nameEn: 'Xingtai',      lat: 37.0682, lon: 114.5048, country: '中国', countryEn: 'CN', population: 7111000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'baoding',    name: '保定',   nameEn: 'Baoding',      lat: 38.8671, lon: 115.4845, country: '中国', countryEn: 'CN', population: 11430000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhangjiakou',name: '张家口',nameEn: 'Zhangjiakou',  lat: 40.8246, lon: 114.8801, country: '中国', countryEn: 'CN', population: 4118000, timezone: 'Asia/Shanghai (UTC+8)', aliases: ['张垣'] },
+  { id: 'chengde',    name: '承德',   nameEn: 'Chengde',      lat: 40.9519, lon: 117.9634, country: '中国', countryEn: 'CN', population: 3354000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'cangzhou',   name: '沧州',   nameEn: 'Cangzhou',     lat: 38.3104, lon: 116.8388, country: '中国', countryEn: 'CN', population: 7305000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'langfang',   name: '廊坊',   nameEn: 'Langfang',     lat: 39.5379, lon: 116.6836, country: '中国', countryEn: 'CN', population: 5464000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hengshui',   name: '衡水',   nameEn: 'Hengshui',     lat: 37.7385, lon: 115.6705, country: '中国', countryEn: 'CN', population: 4213000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'weifang',    name: '潍坊',   nameEn: 'Weifang',      lat: 36.7068, lon: 119.1619, country: '中国', countryEn: 'CN', population: 9373000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yantai',     name: '烟台',   nameEn: 'Yantai',       lat: 37.4638, lon: 121.4478, country: '中国', countryEn: 'CN', population: 7102000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'weihai',     name: '威海',   nameEn: 'Weihai',       lat: 37.5128, lon: 122.1201, country: '中国', countryEn: 'CN', population: 2906000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'rizhao',     name: '日照',   nameEn: 'Rizhao',       lat: 35.4164, lon: 119.5269, country: '中国', countryEn: 'CN', population: 2968000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'linyi',      name: '临沂',   nameEn: 'Linyi',        lat: 35.1042, lon: 118.3564, country: '中国', countryEn: 'CN', population: 11018000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zaozhuang',  name: '枣庄',   nameEn: 'Zaozhuang',    lat: 34.8108, lon: 117.3239, country: '中国', countryEn: 'CN', population: 3927000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jining',     name: '济宁',   nameEn: 'Jining',       lat: 35.4147, lon: 116.5871, country: '中国', countryEn: 'CN', population: 8358000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'taian',      name: '泰安',   nameEn: 'Tai\'an',      lat: 36.1939, lon: 117.0875, country: '中国', countryEn: 'CN', population: 5472000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'weihai2',    name: '德州',   nameEn: 'Dezhou',       lat: 37.4346, lon: 116.3575, country: '中国', countryEn: 'CN', population: 5611000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'liaocheng',  name: '聊城',   nameEn: 'Liaocheng',    lat: 36.4566, lon: 115.9856, country: '中国', countryEn: 'CN', population: 5952000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'binzhou',    name: '滨州',   nameEn: 'Binzhou',      lat: 37.3835, lon: 117.9706, country: '中国', countryEn: 'CN', population: 3929000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'heze',       name: '菏泽',   nameEn: 'Heze',         lat: 35.2333, lon: 115.4810, country: '中国', countryEn: 'CN', population: 8796000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'datong',     name: '大同',   nameEn: 'Datong',       lat: 40.0768, lon: 113.3001, country: '中国', countryEn: 'CN', population: 3100000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yangquan',   name: '阳泉',   nameEn: 'Yangquan',     lat: 37.8576, lon: 113.5763, country: '中国', countryEn: 'CN', population: 1319000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'changzhi',   name: '长治',   nameEn: 'Changzhi',     lat: 36.1955, lon: 113.1163, country: '中国', countryEn: 'CN', population: 3150000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jincheng',   name: '晋城',   nameEn: 'Jincheng',     lat: 35.4906, lon: 112.8514, country: '中国', countryEn: 'CN', population: 2199000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shuozhou',   name: '朔州',   nameEn: 'Shuozhou',     lat: 39.3315, lon: 112.4329, country: '中国', countryEn: 'CN', population: 1593000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xinzhou',    name: '忻州',   nameEn: 'Xinzhou',      lat: 38.4167, lon: 112.7341, country: '中国', countryEn: 'CN', population: 2675000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'linfen',     name: '临汾',   nameEn: 'Linfen',       lat: 36.0880, lon: 111.5180, country: '中国', countryEn: 'CN', population: 3912000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yuncheng',   name: '运城',   nameEn: 'Yuncheng',     lat: 35.0269, lon: 110.9980, country: '中国', countryEn: 'CN', population: 4770000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 江苏/安徽/浙江补充
+  { id: 'xuzhou',     name: '徐州',   nameEn: 'Xuzhou',       lat: 34.2044, lon: 117.2857, country: '中国', countryEn: 'CN', population: 9028000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'lianyungang',name: '连云港',nameEn: 'Lianyungang',  lat: 34.5967, lon: 119.2218, country: '中国', countryEn: 'CN', population: 4594000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huaian',     name: '淮安',   nameEn: 'Huai\'an',     lat: 33.6100, lon: 119.0149, country: '中国', countryEn: 'CN', population: 4562000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yancheng',   name: '盐城',   nameEn: 'Yancheng',     lat: 33.3500, lon: 120.1573, country: '中国', countryEn: 'CN', population: 6700000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yangzhou',   name: '扬州',   nameEn: 'Yangzhou',     lat: 32.3947, lon: 119.4124, country: '中国', countryEn: 'CN', population: 4581000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhenjiang',  name: '镇江',   nameEn: 'Zhenjiang',    lat: 32.1878, lon: 119.4241, country: '中国', countryEn: 'CN', population: 3211000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'changzhou',  name: '常州',   nameEn: 'Changzhou',    lat: 31.7728, lon: 119.9469, country: '中国', countryEn: 'CN', population: 5281000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nantong',    name: '南通',   nameEn: 'Nantong',      lat: 31.9803, lon: 120.8943, country: '中国', countryEn: 'CN', population: 7740000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'taizhou_js', name: '泰州',   nameEn: 'Taizhou',      lat: 32.4554, lon: 119.9250, country: '中国', countryEn: 'CN', population: 4512000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'suqian',     name: '宿迁',   nameEn: 'Suqian',       lat: 33.9610, lon: 118.2752, country: '中国', countryEn: 'CN', population: 4986000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'bozhou',     name: '亳州',   nameEn: 'Bozhou',       lat: 33.8693, lon: 115.7787, country: '中国', countryEn: 'CN', population: 4967000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huaibei',    name: '淮北',   nameEn: 'Huaibei',      lat: 33.9716, lon: 116.7986, country: '中国', countryEn: 'CN', population: 1974000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'fuyang',     name: '阜阳',   nameEn: 'Fuyang',       lat: 32.8901, lon: 115.8146, country: '中国', countryEn: 'CN', population: 8200000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'bozhou2',    name: '宿州',   nameEn: 'Suzhou',       lat: 33.6464, lon: 116.9842, country: '中国', countryEn: 'CN', population: 5324000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chuzhou',    name: '滁州',   nameEn: 'Chuzhou',      lat: 32.3019, lon: 118.3168, country: '中国', countryEn: 'CN', population: 3982000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'luan',       name: '六安',   nameEn: 'Lu\'an',       lat: 31.7335, lon: 116.5076, country: '中国', countryEn: 'CN', population: 4394000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chaohu',     name: '巢湖',   nameEn: 'Chaohu',       lat: 31.6248, lon: 117.8624, country: '中国', countryEn: 'CN', population: 3871000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'tongling',   name: '铜陵',   nameEn: 'Tongling',     lat: 30.9300, lon: 117.8121, country: '中国', countryEn: 'CN', population: 1316000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'anqing',     name: '安庆',   nameEn: 'Anqing',       lat: 30.5430, lon: 117.0635, country: '中国', countryEn: 'CN', population: 4163000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huangshan',  name: '黄山',   nameEn: 'Huangshan',    lat: 29.7147, lon: 118.3375, country: '中国', countryEn: 'CN', population: 1336000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chizhou',    name: '池州',   nameEn: 'Chizhou',      lat: 30.6646, lon: 117.4915, country: '中国', countryEn: 'CN', population: 1392000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xuancheng',  name: '宣城',   nameEn: 'Xuancheng',    lat: 30.9406, lon: 118.7588, country: '中国', countryEn: 'CN', population: 2487000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jiaxing',    name: '嘉兴',   nameEn: 'Jiaxing',      lat: 30.7522, lon: 120.7506, country: '中国', countryEn: 'CN', population: 5551000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huzhou',     name: '湖州',   nameEn: 'Huzhou',       lat: 30.8932, lon: 120.0875, country: '中国', countryEn: 'CN', population: 3405000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shaoxing',   name: '绍兴',   nameEn: 'Shaoxing',     lat: 30.0023, lon: 120.5810, country: '中国', countryEn: 'CN', population: 5350000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jinhua',     name: '金华',   nameEn: 'Jinhua',       lat: 29.0784, lon: 119.6474, country: '中国', countryEn: 'CN', population: 7124000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'quzhou',     name: '衢州',   nameEn: 'Quzhou',       lat: 28.9359, lon: 118.8593, country: '中国', countryEn: 'CN', population: 2276000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhoushan',   name: '舟山',   nameEn: 'Zhoushan',     lat: 29.9853, lon: 122.2072, country: '中国', countryEn: 'CN', population: 1157000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'taizhou_zj', name: '台州',   nameEn: 'Taizhou',      lat: 28.6560, lon: 121.4208, country: '中国', countryEn: 'CN', population: 6627000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'lishui',     name: '丽水',   nameEn: 'Lishui',       lat: 28.4516, lon: 119.9229, country: '中国', countryEn: 'CN', population: 2500000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 福建/江西补充
+  { id: 'putian',     name: '莆田',   nameEn: 'Putian',       lat: 25.4540, lon: 119.0078, country: '中国', countryEn: 'CN', population: 3210000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'quanzhou',   name: '泉州',   nameEn: 'Quanzhou',     lat: 24.8741, lon: 118.6757, country: '中国', countryEn: 'CN', population: 8782000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhangzhou',  name: '漳州',   nameEn: 'Zhangzhou',    lat: 24.5130, lon: 117.6471, country: '中国', countryEn: 'CN', population: 5054000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'longyan',    name: '龙岩',   nameEn: 'Longyan',      lat: 25.0916, lon: 117.0297, country: '中国', countryEn: 'CN', population: 2724000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ningde',     name: '宁德',   nameEn: 'Ningde',       lat: 26.6656, lon: 119.5478, country: '中国', countryEn: 'CN', population: 2900000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'sanming',    name: '三明',   nameEn: 'Sanming',      lat: 26.2655, lon: 117.6390, country: '中国', countryEn: 'CN', population: 2480000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nanping',    name: '南平',   nameEn: 'Nanping',      lat: 26.6418, lon: 118.1780, country: '中国', countryEn: 'CN', population: 2680000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jiujiang',   name: '九江',   nameEn: 'Jiujiang',     lat: 29.7050, lon: 116.0010, country: '中国', countryEn: 'CN', population: 4601000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shangrao',   name: '上饶',   nameEn: 'Shangrao',     lat: 28.4544, lon: 117.9433, country: '中国', countryEn: 'CN', population: 6485000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yichun_jx',  name: '宜春',   nameEn: 'Yichun',       lat: 27.8043, lon: 114.4163, country: '中国', countryEn: 'CN', population: 5532000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'fuzhou_jx',  name: '抚州',   nameEn: 'Fuzhou',       lat: 27.9485, lon: 116.3582, country: '中国', countryEn: 'CN', population: 3612000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jian',       name: '吉安',   nameEn: 'Ji\'an',       lat: 27.1138, lon: 114.9866, country: '中国', countryEn: 'CN', population: 4423000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ganzhou',    name: '赣州',   nameEn: 'Ganzhou',      lat: 25.8453, lon: 114.9352, country: '中国', countryEn: 'CN', population: 8970000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yichun_jx2', name: '新余',   nameEn: 'Xinyu',        lat: 27.8174, lon: 114.9170, country: '中国', countryEn: 'CN', population: 1200000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'pingxiang',  name: '萍乡',   nameEn: 'Pingxiang',    lat: 27.6229, lon: 113.8542, country: '中国', countryEn: 'CN', population: 1804000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jingdezhen', name: '景德镇',nameEn: 'Jingdezhen',   lat: 29.2682, lon: 117.1784, country: '中国', countryEn: 'CN', population: 1618000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 河南/湖北/湖南补充
+  { id: 'kaifeng',    name: '开封',   nameEn: 'Kaifeng',      lat: 34.7980, lon: 114.3072, country: '中国', countryEn: 'CN', population: 4824000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'luoyang',    name: '洛阳',   nameEn: 'Luoyang',      lat: 34.6197, lon: 112.4540, country: '中国', countryEn: 'CN', population: 6922000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'pingdingshan',name: '平顶山',nameEn: 'Pingdingshan', lat: 33.7660, lon: 113.1923, country: '中国', countryEn: 'CN', population: 4905000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'anyang',     name: '安阳',   nameEn: 'Anyang',       lat: 36.0995, lon: 114.3925, country: '中国', countryEn: 'CN', population: 5085000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hebi',       name: '鹤壁',   nameEn: 'Hebi',         lat: 35.7475, lon: 114.2974, country: '中国', countryEn: 'CN', population: 1574000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xinxiang',   name: '新乡',   nameEn: 'Xinxiang',     lat: 35.3030, lon: 113.9268, country: '中国', countryEn: 'CN', population: 5718000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jiaozuo',    name: '焦作',   nameEn: 'Jiaozuo',      lat: 35.2159, lon: 113.2418, country: '中国', countryEn: 'CN', population: 3525000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'puyang',     name: '濮阳',   nameEn: 'Puyang',       lat: 35.7682, lon: 115.0292, country: '中国', countryEn: 'CN', population: 3598000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xuchang',    name: '许昌',   nameEn: 'Xuchang',      lat: 34.0357, lon: 113.8262, country: '中国', countryEn: 'CN', population: 4380000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'luohe',      name: '漯河',   nameEn: 'Luohe',        lat: 33.5819, lon: 114.0167, country: '中国', countryEn: 'CN', population: 2614000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'sanmenxia',  name: '三门峡',nameEn: 'Sanmenxia',    lat: 34.7726, lon: 111.2003, country: '中国', countryEn: 'CN', population: 2035000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nanyang',    name: '南阳',   nameEn: 'Nanyang',      lat: 32.9908, lon: 112.5283, country: '中国', countryEn: 'CN', population: 9713000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shangqiu',   name: '商丘',   nameEn: 'Shangqiu',     lat: 34.4148, lon: 115.6505, country: '中国', countryEn: 'CN', population: 7337000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xinyang',    name: '信阳',   nameEn: 'Xinyang',      lat: 32.1280, lon: 114.0687, country: '中国', countryEn: 'CN', population: 6234000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhoukou',    name: '周口',   nameEn: 'Zhoukou',      lat: 33.6204, lon: 114.6497, country: '中国', countryEn: 'CN', population: 9026000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhumadian',  name: '驻马店',nameEn: 'Zhumadian',    lat: 32.9802, lon: 114.0249, country: '中国', countryEn: 'CN', population: 6924000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huangshi',   name: '黄石',   nameEn: 'Huangshi',     lat: 30.1995, lon: 115.0388, country: '中国', countryEn: 'CN', population: 2444000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shiyan',     name: '十堰',   nameEn: 'Shiyan',       lat: 32.6298, lon: 110.7980, country: '中国', countryEn: 'CN', population: 3209000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yichang',    name: '宜昌',   nameEn: 'Yichang',      lat: 30.6919, lon: 111.2864, country: '中国', countryEn: 'CN', population: 3924000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xiangyang',  name: '襄阳',   nameEn: 'Xiangyang',    lat: 32.0094, lon: 112.1226, country: '中国', countryEn: 'CN', population: 5256000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ezhou',      name: '鄂州',   nameEn: 'Ezhou',        lat: 30.3964, lon: 114.8950, country: '中国', countryEn: 'CN', population: 1077000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jingmen',    name: '荆门',   nameEn: 'Jingmen',      lat: 31.0354, lon: 112.2048, country: '中国', countryEn: 'CN', population: 2870000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xiaogan',    name: '孝感',   nameEn: 'Xiaogan',      lat: 30.9264, lon: 113.9165, country: '中国', countryEn: 'CN', population: 4270000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jingzhou',   name: '荆州',   nameEn: 'Jingzhou',     lat: 30.3346, lon: 112.2410, country: '中国', countryEn: 'CN', population: 5137000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huanggang',  name: '黄冈',   nameEn: 'Huanggang',    lat: 30.4533, lon: 114.8721, country: '中国', countryEn: 'CN', population: 5883000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xianning',   name: '咸宁',   nameEn: 'Xianning',     lat: 29.8410, lon: 114.3220, country: '中国', countryEn: 'CN', population: 2467000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'enshi',      name: '恩施',   nameEn: 'Enshi',        lat: 30.2722, lon: 109.4889, country: '中国', countryEn: 'CN', population: 3397000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'suizhou',    name: '随州',   nameEn: 'Suizhou',      lat: 31.6900, lon: 113.3733, country: '中国', countryEn: 'CN', population: 2046000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhengzhou',  name: '株洲',   nameEn: 'Zhuzhou',      lat: 27.8358, lon: 113.1313, country: '中国', countryEn: 'CN', population: 3882000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xiangtan',   name: '湘潭',   nameEn: 'Xiangtan',     lat: 27.8297, lon: 112.9438, country: '中国', countryEn: 'CN', population: 2702000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hengyang',   name: '衡阳',   nameEn: 'Hengyang',     lat: 26.8943, lon: 112.5717, country: '中国', countryEn: 'CN', population: 6645000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yueyang',    name: '岳阳',   nameEn: 'Yueyang',      lat: 29.3572, lon: 113.1289, country: '中国', countryEn: 'CN', population: 5052000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'changde',    name: '常德',   nameEn: 'Changde',      lat: 29.0317, lon: 111.6985, country: '中国', countryEn: 'CN', population: 5279000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhangjiajie',name: '张家界',nameEn: 'Zhangjiajie',  lat: 29.1170, lon: 110.4791, country: '中国', countryEn: 'CN', population: 1517000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yiyang',     name: '益阳',   nameEn: 'Yiyang',       lat: 28.5538, lon: 112.3551, country: '中国', countryEn: 'CN', population: 3856000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chenzhou',   name: '郴州',   nameEn: 'Chenzhou',     lat: 25.7707, lon: 113.0149, country: '中国', countryEn: 'CN', population: 4614000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yongzhou',   name: '永州',   nameEn: 'Yongzhou',     lat: 26.4203, lon: 111.6086, country: '中国', countryEn: 'CN', population: 5195000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huaihua',    name: '怀化',   nameEn: 'Huaihua',      lat: 27.5569, lon: 110.0010, country: '中国', countryEn: 'CN', population: 4561000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'loudi',      name: '娄底',   nameEn: 'Loudi',        lat: 27.7280, lon: 111.9968, country: '中国', countryEn: 'CN', population: 3750000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shaoyang',   name: '邵阳',   nameEn: 'Shaoyang',     lat: 27.2389, lon: 111.4677, country: '中国', countryEn: 'CN', population: 6469000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 广东/广西/海南补充
+  { id: 'shaoguan',   name: '韶关',   nameEn: 'Shaoguan',     lat: 24.8104, lon: 113.5972, country: '中国', countryEn: 'CN', population: 2855000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shantou',    name: '汕头',   nameEn: 'Shantou',      lat: 23.3535, lon: 116.6818, country: '中国', countryEn: 'CN', population: 5502000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'foshan',     name: '佛山',   nameEn: 'Foshan',       lat: 23.0218, lon: 113.1219, country: '中国', countryEn: 'CN', population: 9499000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jiangmen',   name: '江门',   nameEn: 'Jiangmen',     lat: 22.5787, lon: 113.0815, country: '中国', countryEn: 'CN', population: 4562000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhanjiang',  name: '湛江',   nameEn: 'Zhanjiang',    lat: 21.2707, lon: 110.3594, country: '中国', countryEn: 'CN', population: 6930000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'maoming',    name: '茂名',   nameEn: 'Maoming',      lat: 21.6629, lon: 110.9255, country: '中国', countryEn: 'CN', population: 6174000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhaoqing',   name: '肇庆',   nameEn: 'Zhaoqing',     lat: 23.0470, lon: 112.4654, country: '中国', countryEn: 'CN', population: 4052000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huizhou',    name: '惠州',   nameEn: 'Huizhou',      lat: 23.1115, lon: 114.4161, country: '中国', countryEn: 'CN', population: 6041000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'meizhou',    name: '梅州',   nameEn: 'Meizhou',      lat: 24.2886, lon: 116.1226, country: '中国', countryEn: 'CN', population: 3873000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shantou2',   name: '汕尾',   nameEn: 'Shanwei',      lat: 22.7787, lon: 115.3756, country: '中国', countryEn: 'CN', population: 2674000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'heyuan',     name: '河源',   nameEn: 'Heyuan',       lat: 23.7434, lon: 114.7004, country: '中国', countryEn: 'CN', population: 2833000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yangjiang',  name: '阳江',   nameEn: 'Yangjiang',    lat: 21.8582, lon: 111.9822, country: '中国', countryEn: 'CN', population: 2387000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qingyuan',   name: '清远',   nameEn: 'Qingyuan',     lat: 23.6817, lon: 113.0563, country: '中国', countryEn: 'CN', population: 3963000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'dongguan',   name: '东莞',   nameEn: 'Dongguan',     lat: 23.0207, lon: 113.7518, country: '中国', countryEn: 'CN', population: 10466600, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhongshan',  name: '中山',   nameEn: 'Zhongshan',    lat: 22.5159, lon: 113.3927, country: '中国', countryEn: 'CN', population: 4418000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huizhou2',   name: '潮州',   nameEn: 'Chaozhou',     lat: 23.6618, lon: 116.6224, country: '中国', countryEn: 'CN', population: 2568000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jieyang',    name: '揭阳',   nameEn: 'Jieyang',      lat: 23.5498, lon: 116.3727, country: '中国', countryEn: 'CN', population: 5264000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yunfu',      name: '云浮',   nameEn: 'Yunfu',        lat: 22.9151, lon: 112.0444, country: '中国', countryEn: 'CN', population: 2386000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nanning',    name: '南宁',   nameEn: 'Nanning',      lat: 22.8170, lon: 108.3665, country: '中国', countryEn: 'CN', population: 8741000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'liuzhou',    name: '柳州',   nameEn: 'Liuzhou',      lat: 24.3146, lon: 109.4281, country: '中国', countryEn: 'CN', population: 4158000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guilin',     name: '桂林',   nameEn: 'Guilin',       lat: 25.2736, lon: 110.2900, country: '中国', countryEn: 'CN', population: 4931000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wuzhou',     name: '梧州',   nameEn: 'Wuzhou',       lat: 23.4761, lon: 111.2790, country: '中国', countryEn: 'CN', population: 2820000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'beihai',     name: '北海',   nameEn: 'Beihai',       lat: 21.4733, lon: 109.1196, country: '中国', countryEn: 'CN', population: 1745000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'fangchenggang',name:'防城港',nameEn:'Fangchenggang',lat: 21.6862, lon: 108.3454, country: '中国', countryEn: 'CN', population: 920000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guigang',    name: '贵港',   nameEn: 'Guigang',      lat: 23.0935, lon: 109.5984, country: '中国', countryEn: 'CN', population: 4316000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yulin_gx',   name: '玉林',   nameEn: 'Yulin',        lat: 22.6541, lon: 110.1810, country: '中国', countryEn: 'CN', population: 5714000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'baise',      name: '百色',   nameEn: 'Baise',        lat: 23.9020, lon: 106.6184, country: '中国', countryEn: 'CN', population: 3571000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hezhou',     name: '贺州',   nameEn: 'Hezhou',       lat: 24.4034, lon: 111.5527, country: '中国', countryEn: 'CN', population: 2030000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hechi',      name: '河池',   nameEn: 'Hechi',        lat: 24.6929, lon: 108.0851, country: '中国', countryEn: 'CN', population: 3355000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'laibin',     name: '来宾',   nameEn: 'Laibin',       lat: 23.7507, lon: 109.2298, country: '中国', countryEn: 'CN', population: 2098000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chongzuo',   name: '崇左',   nameEn: 'Chongzuo',     lat: 22.4040, lon: 107.3645, country: '中国', countryEn: 'CN', population: 2088000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 西北/西南补充
+  { id: 'tianshui',   name: '天水',   nameEn: 'Tianshui',     lat: 34.5805, lon: 105.7249, country: '中国', countryEn: 'CN', population: 2954000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'baiyin',     name: '白银',   nameEn: 'Baiyin',       lat: 36.5447, lon: 104.1381, country: '中国', countryEn: 'CN', population: 1741000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jinchang',   name: '金昌',   nameEn: 'Jinchang',     lat: 38.5141, lon: 102.1879, country: '中国', countryEn: 'CN', population: 438000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wuwei',      name: '武威',   nameEn: 'Wuwei',        lat: 37.9283, lon: 102.6411, country: '中国', countryEn: 'CN', population: 1825000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhangye',    name: '张掖',   nameEn: 'Zhangye',      lat: 38.9259, lon: 100.4498, country: '中国', countryEn: 'CN', population: 1138000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'pingliang',  name: '平凉',   nameEn: 'Pingliang',    lat: 35.5430, lon: 106.6650, country: '中国', countryEn: 'CN', population: 2087000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'jiuquan',    name: '酒泉',   nameEn: 'Jiuquan',      lat: 39.7325, lon: 98.4949, country: '中国', countryEn: 'CN', population: 1113000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qingyang',   name: '庆阳',   nameEn: 'Qingyang',     lat: 35.7340, lon: 107.6440, country: '中国', countryEn: 'CN', population: 2175000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'dingxi',     name: '定西',   nameEn: 'Dingxi',       lat: 35.5810, lon: 104.6266, country: '中国', countryEn: 'CN', population: 2525000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'longnan',    name: '陇南',   nameEn: 'Longnan',      lat: 33.4000, lon: 104.9217, country: '中国', countryEn: 'CN', population: 2407000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'linxia',     name: '临夏',   nameEn: 'Linxia',       lat: 35.5995, lon: 103.2122, country: '中国', countryEn: 'CN', population: 2040000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'gannan',     name: '甘南',   nameEn: 'Gannan',       lat: 34.9864, lon: 102.9111, country: '中国', countryEn: 'CN', population: 712000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shizuishan', name: '石嘴山',nameEn: 'Shizuishan',   lat: 38.9841, lon: 106.3835, country: '中国', countryEn: 'CN', population: 800000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wuzhong',    name: '吴忠',   nameEn: 'Wuzhong',      lat: 37.9863, lon: 106.1990, country: '中国', countryEn: 'CN', population: 1384000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guyuan',     name: '固原',   nameEn: 'Guyuan',       lat: 36.0046, lon: 106.2434, country: '中国', countryEn: 'CN', population: 1142000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhongwei',   name: '中卫',   nameEn: 'Zhongwei',     lat: 37.5149, lon: 105.1896, country: '中国', countryEn: 'CN', population: 1066000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'haibei',     name: '海北',   nameEn: 'Haibei',       lat: 36.9595, lon: 100.9009, country: '中国', countryEn: 'CN', population: 283000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'haidong',    name: '海东',   nameEn: 'Haidong',      lat: 36.4820, lon: 102.1040, country: '中国', countryEn: 'CN', population: 1480000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'huangnan',   name: '黄南',   nameEn: 'Huangnan',     lat: 35.5197, lon: 102.0193, country: '中国', countryEn: 'CN', population: 280000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'hainan_qh',  name: '海南州',nameEn: 'Hainan',       lat: 36.2864, lon: 100.6201, country: '中国', countryEn: 'CN', population: 472000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guoluo',     name: '果洛',   nameEn: 'Golog',        lat: 34.4736, lon: 100.2451, country: '中国', countryEn: 'CN', population: 215000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yushu',      name: '玉树',   nameEn: 'Yushu',        lat: 33.0040, lon: 97.0064, country: '中国', countryEn: 'CN', population: 415000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'haixi',      name: '海西',   nameEn: 'Haixi',        lat: 37.3744, lon: 97.3706, country: '中国', countryEn: 'CN', population: 517000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shihezi',    name: '石河子',nameEn: 'Shihezi',      lat: 44.3052, lon: 86.0376, country: '中国', countryEn: 'CN', population: 685000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'changji',    name: '昌吉',   nameEn: 'Changji',      lat: 44.0144, lon: 87.3041, country: '中国', countryEn: 'CN', population: 1610000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'turpan',     name: '吐鲁番',nameEn: 'Turpan',       lat: 42.9514, lon: 89.1893, country: '中国', countryEn: 'CN', population: 633000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'hami',       name: '哈密',   nameEn: 'Hami',         lat: 42.8190, lon: 93.5151, country: '中国', countryEn: 'CN', population: 559000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'korla',      name: '库尔勒',nameEn: 'Korla',        lat: 41.7641, lon: 86.1454, country: '中国', countryEn: 'CN', population: 817000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'kashgar',    name: '喀什',   nameEn: 'Kashgar',      lat: 39.4677, lon: 75.9938, country: '中国', countryEn: 'CN', population: 464000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'yining',     name: '伊宁',   nameEn: 'Yining',       lat: 43.9219, lon: 81.3175, country: '中国', countryEn: 'CN', population: 570000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'aksu',       name: '阿克苏',nameEn: 'Aksu',         lat: 41.1683, lon: 80.2647, country: '中国', countryEn: 'CN', population: 562000, timezone: 'Asia/Urumqi (UTC+6)' },
+  { id: 'panzhihua',  name: '攀枝花',nameEn: 'Panzhihua',    lat: 26.5824, lon: 101.7188, country: '中国', countryEn: 'CN', population: 1214000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'luzhou',     name: '泸州',   nameEn: 'Luzhou',       lat: 28.8717, lon: 105.4433, country: '中国', countryEn: 'CN', population: 4254000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'deyang',     name: '德阳',   nameEn: 'Deyang',       lat: 31.1268, lon: 104.3979, country: '中国', countryEn: 'CN', population: 3456000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'mianyang',   name: '绵阳',   nameEn: 'Mianyang',     lat: 31.4678, lon: 104.6796, country: '中国', countryEn: 'CN', population: 4868000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guangyuan',  name: '广元',   nameEn: 'Guangyuan',    lat: 32.4358, lon: 105.8438, country: '中国', countryEn: 'CN', population: 2304000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'suining',    name: '遂宁',   nameEn: 'Suining',      lat: 30.5328, lon: 105.5713, country: '中国', countryEn: 'CN', population: 3204000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'neijiang',   name: '内江',   nameEn: 'Neijiang',     lat: 29.5870, lon: 105.0584, country: '中国', countryEn: 'CN', population: 3141000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'leshan',     name: '乐山',   nameEn: 'Leshan',       lat: 29.5521, lon: 103.7657, country: '中国', countryEn: 'CN', population: 3160000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nanchong',   name: '南充',   nameEn: 'Nanchong',     lat: 30.7956, lon: 106.0826, country: '中国', countryEn: 'CN', population: 5608000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'meishan',    name: '眉山',   nameEn: 'Meishan',      lat: 30.0750, lon: 103.8484, country: '中国', countryEn: 'CN', population: 2955000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yibin',      name: '宜宾',   nameEn: 'Yibin',        lat: 28.7513, lon: 104.6234, country: '中国', countryEn: 'CN', population: 4589000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'guangan',    name: '广安',   nameEn: 'Guang\'an',    lat: 30.4567, lon: 106.6333, country: '中国', countryEn: 'CN', population: 3255000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'dazhou',     name: '达州',   nameEn: 'Dazhou',       lat: 31.2098, lon: 107.4683, country: '中国', countryEn: 'CN', population: 5370000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yaan',       name: '雅安',   nameEn: 'Ya\'an',       lat: 29.9805, lon: 103.0010, country: '中国', countryEn: 'CN', population: 1435000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'bazhong',    name: '巴中',   nameEn: 'Bazhong',      lat: 31.8581, lon: 106.7474, country: '中国', countryEn: 'CN', population: 2713000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ziyang',     name: '资阳',   nameEn: 'Ziyang',       lat: 30.1222, lon: 104.6418, country: '中国', countryEn: 'CN', population: 2300000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'aba',        name: '阿坝',   nameEn: 'Aba',          lat: 31.8994, lon: 102.2245, country: '中国', countryEn: 'CN', population: 922000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ganzi',      name: '甘孜',   nameEn: 'Garzê',        lat: 30.0496, lon: 101.9636, country: '中国', countryEn: 'CN', population: 1107000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'liangshan',  name: '凉山',   nameEn: 'Liangshan',    lat: 27.8865, lon: 102.2587, country: '中国', countryEn: 'CN', population: 4858000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zunyi',      name: '遵义',   nameEn: 'Zunyi',        lat: 27.7253, lon: 106.9272, country: '中国', countryEn: 'CN', population: 6607000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'liupanshui', name: '六盘水',nameEn: 'Liupanshui',   lat: 26.5917, lon: 104.8329, country: '中国', countryEn: 'CN', population: 3032000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'anshun',     name: '安顺',   nameEn: 'Anshun',       lat: 26.2453, lon: 105.9322, country: '中国', countryEn: 'CN', population: 2454000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'bijie',      name: '毕节',   nameEn: 'Bijie',        lat: 27.2837, lon: 105.2862, country: '中国', countryEn: 'CN', population: 6529000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'tongren',    name: '铜仁',   nameEn: 'Tongren',      lat: 27.7180, lon: 109.1910, country: '中国', countryEn: 'CN', population: 3146000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qiandongnan',name: '黔东南',nameEn: 'Qiandongnan',  lat: 26.5834, lon: 107.9772, country: '中国', countryEn: 'CN', population: 3758000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qiannan',    name: '黔南',   nameEn: 'Qiannan',      lat: 26.2585, lon: 107.5176, country: '中国', countryEn: 'CN', population: 3498000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'qujing',     name: '曲靖',   nameEn: 'Qujing',       lat: 25.4889, lon: 103.7960, country: '中国', countryEn: 'CN', population: 5766000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'yuxi',       name: '玉溪',   nameEn: 'Yuxi',         lat: 24.3514, lon: 102.5430, country: '中国', countryEn: 'CN', population: 2250000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'baoshan',    name: '保山',   nameEn: 'Baoshan',      lat: 25.1118, lon: 99.1611, country: '中国', countryEn: 'CN', population: 2431000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'zhaotong',   name: '昭通',   nameEn: 'Zhaotong',     lat: 27.3367, lon: 103.7173, country: '中国', countryEn: 'CN', population: 5014000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'lijiang',    name: '丽江',   nameEn: 'Lijiang',      lat: 26.8721, lon: 100.2330, country: '中国', countryEn: 'CN', population: 1238000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'puer',       name: '普洱',   nameEn: 'Pu\'er',       lat: 22.8270, lon: 100.9722, country: '中国', countryEn: 'CN', population: 2391000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'lincang',    name: '临沧',   nameEn: 'Lincang',      lat: 23.8866, lon: 100.0790, country: '中国', countryEn: 'CN', population: 2240000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chuxiong',   name: '楚雄',   nameEn: 'Chuxiong',     lat: 25.0418, lon: 101.5460, country: '中国', countryEn: 'CN', population: 2401000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'honghe',     name: '红河',   nameEn: 'Honghe',       lat: 23.3640, lon: 103.3756, country: '中国', countryEn: 'CN', population: 4471000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'wenshan',    name: '文山',   nameEn: 'Wenshan',      lat: 23.3697, lon: 104.2440, country: '中国', countryEn: 'CN', population: 3501000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'xishuangbanna',name: '西双版纳',nameEn: 'Xishuangbanna', lat: 22.0017, lon: 100.7971, country: '中国', countryEn: 'CN', population: 1301000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'dehong',     name: '德宏',   nameEn: 'Dehong',       lat: 24.4366, lon: 98.5783, country: '中国', countryEn: 'CN', population: 1316000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nujiang',    name: '怒江',   nameEn: 'Nujiang',      lat: 25.8533, lon: 98.8540, country: '中国', countryEn: 'CN', population: 552000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'diqing',     name: '迪庆',   nameEn: 'Dêqên',        lat: 27.8269, lon: 99.7066, country: '中国', countryEn: 'CN', population: 410000, timezone: 'Asia/Shanghai (UTC+8)' },
+  // 西藏补充
+  { id: 'shigatse',   name: '日喀则',nameEn: 'Shigatse',     lat: 29.2674, lon: 88.8810, country: '中国', countryEn: 'CN', population: 798000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'shannan',    name: '山南',   nameEn: 'Shannan',      lat: 29.2378, lon: 91.7666, country: '中国', countryEn: 'CN', population: 354000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nagqu',      name: '那曲',   nameEn: 'Nagqu',        lat: 31.4762, lon: 92.0517, country: '中国', countryEn: 'CN', population: 462000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'ali',        name: '阿里',   nameEn: 'Ngari',        lat: 32.5036, lon: 80.1054, country: '中国', countryEn: 'CN', population: 123000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'nyingchi',   name: '林芝',   nameEn: 'Nyingchi',     lat: 29.6543, lon: 94.3624, country: '中国', countryEn: 'CN', population: 239000, timezone: 'Asia/Shanghai (UTC+8)' },
+  { id: 'chanzhi',    name: '昌都',   nameEn: 'Chamdo',       lat: 31.1369, lon: 97.1785, country: '中国', countryEn: 'CN', population: 760000, timezone: 'Asia/Shanghai (UTC+8)' },
+];
+
+const DEFAULT_CITY_IDS = ['beijing', 'shanghai', 'guangzhou', 'shenzhen', 'chengdu', 'hangzhou'];
+const MAX_CITIES = 8;
+const STORAGE_KEY = 'cyberWeatherOrder';
+const STORAGE_KEY_ADDED = 'cyberWeatherAdded';
+const CITY_DB_MAP = Object.fromEntries(CITY_DB.map(c => [c.id, c]));
+
+function loadOrder() {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    const order = s ? JSON.parse(s) : DEFAULT_CITY_IDS;
+    const cities = order.map(id => CITY_DB_MAP[id]).filter(Boolean);
+    // 补充已添加但未在 order 中的城市
+    try {
+      const added = JSON.parse(localStorage.getItem(STORAGE_KEY_ADDED) || '[]');
+      added.forEach(id => { if (!cities.find(c => c.id === id) && CITY_DB_MAP[id]) cities.push(CITY_DB_MAP[id]); });
+    } catch {}
+    return cities.length ? cities : DEFAULT_CITY_IDS.map(id => CITY_DB_MAP[id]);
+  } catch {}
+  return DEFAULT_CITY_IDS.map(id => CITY_DB_MAP[id]);
+}
+function saveOrder() {
+  const order = [...$$('.city-card')].map(c => c.dataset.id);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(order)); } catch {}
+}
+function saveAdded() {
+  // 已添加但不在默认列表中的城市
+  const added = CITIES.filter(c => !DEFAULT_CITY_IDS.includes(c.id)).map(c => c.id);
+  try { localStorage.setItem(STORAGE_KEY_ADDED, JSON.stringify(added)); } catch {}
+}
+function canAddMore() { return CITIES.length < MAX_CITIES; }
+
+let CITIES = loadOrder();
+let modalDataCache = null; // 城市ID -> 完整天气数据 (供模态框使用)
+
+/* ============================================================
+   数据获取 (Open-Meteo 免费 API)
+   ============================================================ */
+async function fetchWeather(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code` +
+    `&hourly=temperature_2m,precipitation_probability` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,weather_code` +
+    `&forecast_days=7&timezone=auto`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+/* 模拟 AQI (Open-Meteo 免费 API 不直接提供 AQI) - 基于湿度 + 风速 + 天气码估测 */
+function estimateAQI(cur, daily) {
+  let base = 40 + Math.random() * 30;
+  if (cur.humidity > 80) base += 20;
+  if (cur.wind < 5) base += 25;
+  if ([45, 48].includes(cur.code)) base += 50; // 雾
+  return Math.round(Math.max(15, Math.min(280, base)));
+}
+
+async function fetchAllWeather() {
+  return Promise.all(CITIES.map(c =>
+    fetchWeather(c.lat, c.lon)
+      .then(d => {
+        const cur = d.current;
+        return {
+          city: c,
+          data: d,
+          current: {
+            temp: cur.temperature_2m,
+            feels: cur.apparent_temperature,
+            humidity: cur.relative_humidity_2m,
+            wind: cur.wind_speed_10m,
+            code: cur.weather_code,
+            uv: d.daily.uv_index_max?.[0] ?? 0,
+          },
+          daily: d.daily,
+          aqi: estimateAQI(cur, d.daily),
+        };
+      })
+      .catch(e => ({ city: c, error: e.message }))
+  ));
+}
+
+/* ============================================================
+   渲染: 城市卡片
+   ============================================================ */
+function renderSkeleton() {
+  const grid = $('#cityGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < CITIES.length; i++) {
+    const el = document.createElement('div');
+    el.className = 'city-card';
+    el.innerHTML = `
+      <div class="card-head">
+        <div class="card-loc">
+          <div class="skeleton skel-line" style="width:60%"></div>
+          <div class="skeleton skel-line" style="width:40%;height:8px"></div>
+        </div>
+        <div class="drag-handle"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="temp-block">
+          <div class="skeleton skel-block" style="height:40px;width:60%"></div>
+          <div class="skeleton skel-line" style="width:50%;height:8px;margin-top:6px"></div>
+        </div>
+        <div class="skeleton skel-block" style="width:64px;height:64px;border-radius:50%"></div>
+      </div>
+      <div class="hud-grid">
+        <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+        <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+        <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+        <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+      </div>
+    `;
+    grid.appendChild(el);
+  }
+}
+
+function renderCities(items) {
+  const grid = $('#cityGrid');
+  grid.innerHTML = '';
+  items.forEach((it, i) => {
+    if (it.error) {
+      const el = document.createElement('div');
+      el.className = 'city-card';
+      el.dataset.id = it.city.id;
+      el.dataset.idx = i;
+      el.draggable = true;
+      el.innerHTML = `<div style="padding:40px 0;text-align:center;color:#ff80c5">${it.city.name}<br>连接失败</div>`;
+      grid.appendChild(el);
+      return;
+    }
+    // 使用统一的 renderCityCardHTML
+    const temp = document.createElement('div');
+    temp.innerHTML = renderCityCardHTML(it, i, false);
+    const card = temp.firstElementChild;
+    grid.appendChild(card);
+  });
+  attachDragHandlers();
+}
+
+function renderCityCardHTML(item, i, withId = true) {
+  const { city, current, daily, aqi } = item;
+  const uv = uvLevel(current.uv);
+  const aq = aqiLevel(aqi);
+  const maxs = daily.temperature_2m_max || [];
+  const mins = daily.temperature_2m_min || [];
+  const temps = maxs.slice(0, 7).map((m, idx) => (m + mins[idx]) / 2);
+  const gradId = `sg_${i}_${Date.now()}`;
+  return `
+    <div class="city-card" ${withId ? '' : ''} data-id="${city.id}" data-idx="${i}" draggable="true">
+      <div class="scan"></div>
+      <div class="barcode">
+        <span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="card-head">
+        <div class="card-loc">
+          <div class="name">${city.name}</div>
+          <div class="meta">${fmt(current.temp, 0)}°C <span class="dot">/</span> ${wmoDesc(current.code)}</div>
+        </div>
+        <button class="remove-btn" data-remove="${city.id}" title="移除城市" aria-label="移除城市">×</button>
+        <div class="drag-handle" title="拖拽排序">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="temp-block">
+          <div><span class="now">${fmt(current.temp, 0)}</span><span class="unit">°C</span></div>
+          <div class="desc">体感 ${fmt(current.feels, 0)}°C</div>
+        </div>
+        <div class="weather-icon">${wmoIcon(current.code)}</div>
+      </div>
+      <div class="hud-grid">
+        <div class="hud-item"><div class="lbl">湿度 / RH</div><div class="val">${current.humidity}<span class="u">%</span></div></div>
+        <div class="hud-item"><div class="lbl">风速 / WIND</div><div class="val">${fmt(current.wind, 0)}<span class="u">km/h</span></div></div>
+        <div class="hud-item"><div class="lbl">AQI</div><div class="val" style="color:${aq.c}">${aqi}<span class="u" style="color:${aq.c}">·${aq.l}</span></div></div>
+        <div class="hud-item"><div class="lbl">UV / 紫外</div><div class="val" style="color:${uv.c}">${uv.l}</div></div>
+      </div>
+      <div class="micro-charts">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 36 36">
+            <circle class="ring-bg" cx="18" cy="18" r="16"/>
+            <circle class="ring-fg" cx="18" cy="18" r="16" style="--target:${100 - current.humidity}"/>
+          </svg>
+          <div class="ring-label">${current.humidity}%</div>
+        </div>
+        <div class="micro-info">
+          <div class="ttl">7日温度趋势</div>
+          <div class="val">${fmt(mins[0], 0)}° → ${fmt(maxs[0], 0)}°</div>
+        </div>
+        <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.6"/>
+              <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          ${renderSparkPath(temps).replace(/url\(#sg\)/g, `url(#${gradId})`)}
+        </svg>
+      </div>
+    </div>
+  `;
+}
+
+function renderSparkPath(temps) {
+  if (!temps.length) return '';
+  const min = Math.min(...temps), max = Math.max(...temps);
+  const range = (max - min) || 1;
+  const w = 100, h = 24;
+  const pts = temps.map((t, i) => {
+    const x = (i / (temps.length - 1)) * w;
+    const y = h - ((t - min) / range) * (h - 4) - 2;
+    return [x, y];
+  });
+  const path = pts.map((p, i) => i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`).join(' ');
+  const area = `${path} L${w},${h} L0,${h} Z`;
+  return `<path d="${area}" fill="url(#sg)" />` +
+    `<path d="${path}" fill="none" stroke="#00f0ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 2px #00f0ff)"/>` +
+    pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="1.5" fill="#fff" style="filter:drop-shadow(0 0 2px #00f0ff)"/>`).join('');
+}
+
+/* ============================================================
+   拖拽排序 (原生 HTML5 DnD)
+   ============================================================ */
+let dragSrc = null;
+let ghost = null;
+let offsetX = 0, offsetY = 0;
+
+function attachDragHandlers() {
+  $$('.city-card').forEach(card => {
+    if (card.dataset.bound === '1') return; // 防重复绑定
+    card.dataset.bound = '1';
+    card.addEventListener('dragstart', onDragStart);
+    card.addEventListener('dragend', onDragEnd);
+    card.addEventListener('dragover', onDragOver);
+    card.addEventListener('dragenter', onDragEnter);
+    card.addEventListener('dragleave', onDragLeave);
+    card.addEventListener('drop', onDrop);
+    attachCardClick(card);
+  });
+  // 移除按钮 - 每次重新查询, 避免重复绑定
+  $$('.remove-btn:not([data-rm-bound])').forEach(btn => {
+    btn.dataset.rmBound = '1';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeCity(btn.dataset.remove);
+    });
+  });
+}
+
+function attachCardClick(card, idx) {
+  if (card.dataset.clickBound === '1') return;
+  card.dataset.clickBound = '1';
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.remove-btn') || e.target.closest('.drag-handle')) return;
+    if (card.classList.contains('dragging')) return;
+    const i = parseInt(card.dataset.idx || idx || '0', 10);
+    openCityModal(i);
+  });
+}
+
+/* ============================================================
+   城市计数
+   ============================================================ */
+function updateCityCount() {
+  // 已移除 UI 显示, 保留函数供内部逻辑调用
+}
+
+/* ============================================================
+   搜索功能
+   ============================================================ */
+function normalize(s) { return (s || '').toLowerCase().trim(); }
+function searchCities(q) {
+  if (!q) return [];
+  const qq = normalize(q);
+  // 优先精确开头匹配 > 子串匹配, 同时支持中英文/国家/省份/别名
+  const results = [];
+  const lowerQQ = qq;
+  for (const c of CITY_DB) {
+    if (results.find(x => x.id === c.id)) continue;
+    // 别名 / 别名 (例如 "NYC" -> New York, "SF" -> San Francisco, "台北" -> 台北)
+    if (c.aliases && c.aliases.some(a => normalize(a) === lowerQQ || normalize(a).includes(lowerQQ))) {
+      results.unshift(c); continue;
+    }
+    const name = normalize(c.name);
+    const nameEn = normalize(c.nameEn);
+    const country = normalize(c.country);
+    const id = normalize(c.id);
+    // 完全相等 -> 置顶
+    if (name === lowerQQ || nameEn === lowerQQ || id === lowerQQ) {
+      results.unshift(c);
+    } else if (name.startsWith(lowerQQ) || nameEn.startsWith(lowerQQ) || id.startsWith(lowerQQ)) {
+      results.push({ ...c, _prefix: true });
+    } else if (name.includes(lowerQQ) || nameEn.includes(lowerQQ) || country.includes(lowerQQ) || id.includes(lowerQQ)) {
+      results.push(c);
+    }
+    if (results.length >= 50) break;
+  }
+  return results.slice(0, 30);
+}
+function positionSearchDropdown() {
+  const dd = $('#searchDropdown');
+  const search = $('#citySearch');
+  if (!dd || !search) return;
+  const rect = search.getBoundingClientRect();
+  dd.style.left = rect.left + 'px';
+  dd.style.width = rect.width + 'px';
+  // 优先向下展开, 下方空间不够则向上
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const ddMaxH = 360;
+  if (spaceBelow >= ddMaxH + 20 || spaceBelow >= 200) {
+    dd.style.top = (rect.bottom + 6) + 'px';
+    dd.style.bottom = 'auto';
+    dd.style.maxHeight = Math.min(ddMaxH, spaceBelow - 20) + 'px';
+  } else {
+    dd.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+    dd.style.top = 'auto';
+    dd.style.maxHeight = Math.min(ddMaxH, rect.top - 20) + 'px';
+  }
+}
+function renderSearchResults(results, q) {
+  const dd = $('#searchDropdown');
+  if (!q) { dd.classList.remove('show'); dd.innerHTML = ''; return; }
+  if (!results.length) {
+    dd.innerHTML = `<div class="search-empty">没有找到匹配 "${q}" 的城市</div>`;
+    positionSearchDropdown();
+    dd.classList.add('show');
+    return;
+  }
+  dd.innerHTML = results.map(c => {
+    const added = CITIES.some(x => x.id === c.id);
+    const canAdd = !added && canAddMore();
+    const disabledCls = added ? 'disabled' : (canAddMore() ? '' : 'disabled');
+    const action = added ? '已添加' : (canAddMore() ? '+ 添加' : '已满');
+    return `
+      <div class="search-item ${disabledCls}" data-id="${c.id}">
+        <span class="si-flag">${c.countryEn}</span>
+        <div class="si-info">
+          <div><span class="si-name">${highlight(c.name, q)}</span><span class="si-en">${highlight(c.nameEn, q)}</span></div>
+          <div class="si-country">${c.country} · ${fmtNum(c.population)} 人口</div>
+        </div>
+        <span class="si-action">${action}</span>
+      </div>
+    `;
+  }).join('');
+  positionSearchDropdown();
+  dd.classList.add('show');
+  // 绑定点击
+  $$('.search-item').forEach(el => {
+    if (el.classList.contains('disabled')) return;
+    el.addEventListener('click', () => addCity(el.dataset.id));
+  });
+}
+function highlight(text, q) {
+  if (!text) return '';
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return text;
+  return text.substring(0, idx) + '<mark style="background:rgba(0,240,255,0.3);color:#fff;padding:0 2px;">' + text.substring(idx, idx + q.length) + '</mark>' + text.substring(idx + q.length);
+}
+function fmtNum(n) {
+  if (n >= 1e7) return (n / 1e7).toFixed(1) + '千万';
+  if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
+  return n.toLocaleString();
+}
+
+function addCity(id) {
+  if (CITIES.find(c => c.id === id)) {
+    showToast('该城市已添加', 'warn');
+    return;
+  }
+  if (!canAddMore()) {
+    showToast('已达到 8 个城市上限，请先移除一些城市', 'warn');
+    return;
+  }
+  const city = CITY_DB_MAP[id];
+  if (!city) {
+    showToast('未找到该城市数据', 'error');
+    return;
+  }
+
+  // 1. 立即更新 CITIES 数组 + localStorage (状态同步)
+  CITIES = [...CITIES, city];
+  saveOrder();
+  saveAdded();
+
+  // 2. 立即插入骨架卡片到 DOM, 给予 idx 标识, 关闭下拉 (乐观更新)
+  const tempIdx = CITIES.length - 1;
+  const skeletonId = 'skel_' + Date.now();
+  insertSkeletonCard(city, tempIdx, skeletonId);
+  $('#searchDropdown').classList.remove('show');
+  $('#citySearch').value = '';
+  $('#searchClear').style.display = 'none';
+  showToast(`已添加 ${city.name}`, 'success');
+
+  // 3. 异步获取真实数据, 替换骨架 (失败时回滚)
+  fetchWeather(city.lat, city.lon).then(d => {
+    const cur = d.current;
+    const item = {
+      city,
+      current: { temp: cur.temperature_2m, feels: cur.apparent_temperature, humidity: cur.relative_humidity_2m, wind: cur.wind_speed_10m, code: cur.weather_code, uv: d.daily.uv_index_max?.[0] ?? 0 },
+      daily: d.daily,
+      aqi: estimateAQI(cur, d.daily),
+    };
+    // 缓存模态框数据
+    if (modalDataCache) modalDataCache[city.id] = d;
+    // 替换骨架卡片
+    replaceSkeletonWithReal(skeletonId, item, tempIdx);
+  }).catch(e => {
+    // 回滚: 移除卡片 + 数组
+    const skel = document.getElementById(skeletonId);
+    if (skel) skel.remove();
+    CITIES = CITIES.filter(c => c.id !== id);
+    saveOrder();
+    saveAdded();
+    // 重新计算 idx
+    $$('.city-card').forEach((c, i) => c.dataset.idx = i);
+    showToast(`添加 ${city.name} 失败: ${e.message}`, 'error');
+  });
+}
+
+function insertSkeletonCard(city, idx, skelId) {
+  const grid = $('#cityGrid');
+  const card = document.createElement('div');
+  card.className = 'city-card added-flash';
+  card.id = skelId;
+  card.dataset.id = city.id;
+  card.dataset.idx = idx;
+  card.draggable = true;
+  card.innerHTML = `
+    <div class="scan"></div>
+    <div class="barcode">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="card-head">
+      <div class="card-loc">
+        <div class="name">${city.name}</div>
+        <div class="meta">加载中...</div>
+      </div>
+      <button class="remove-btn" data-remove="${city.id}" title="移除城市" aria-label="移除城市">×</button>
+      <div class="drag-handle" title="拖拽排序">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="temp-block">
+        <div class="skeleton skel-block" style="height:40px;width:60%"></div>
+        <div class="skeleton skel-line" style="width:50%;height:8px;margin-top:6px"></div>
+      </div>
+      <div class="weather-icon">
+        <div class="skeleton skel-block" style="width:50px;height:50px;border-radius:50%"></div>
+      </div>
+    </div>
+    <div class="hud-grid">
+      <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+      <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+      <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+      <div class="hud-item"><div class="skeleton skel-line" style="width:60%;height:8px"></div><div class="skeleton skel-line" style="width:80%;height:12px;margin-top:4px"></div></div>
+    </div>
+  `;
+  grid.appendChild(card);
+}
+
+function replaceSkeletonWithReal(skelId, item, idx) {
+  const oldCard = document.getElementById(skelId);
+  if (!oldCard) return;
+  // 创建新卡片 DOM
+  const tempCard = document.createElement('div');
+  tempCard.innerHTML = renderCityCardHTML(item, idx, true);
+  const newCard = tempCard.firstElementChild;
+  // 保留拖拽/移除的旧监听 -> 不需要, attachDragHandlers 会重新绑定
+  oldCard.replaceWith(newCard);
+  // 触发入场动画
+  newCard.style.opacity = '0';
+  newCard.style.transform = 'translateY(10px)';
+  requestAnimationFrame(() => {
+    newCard.style.transition = 'opacity 0.5s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+    newCard.style.opacity = '1';
+    newCard.style.transform = 'translateY(0)';
+  });
+  // 重新绑定事件
+  attachDragHandlers();
+  attachCardClick(newCard, idx);
+}
+function appendCityCard(item, idx) {
+  const grid = $('#cityGrid');
+  const temp = document.createElement('div');
+  temp.innerHTML = renderCityCardHTML(item, idx, false);
+  const card = temp.firstElementChild;
+  card.classList.add('added-flash');
+  grid.appendChild(card);
+  attachDragHandlers();
+}
+function removeCity(id) {
+  const card = $(`.city-card[data-id="${id}"]`);
+  if (!card) return;
+  if (CITIES.length <= 1) {
+    showToast('至少保留一个城市', 'warn');
+    return;
+  }
+  card.classList.add('removing');
+  setTimeout(() => {
+    card.remove();
+    CITIES = CITIES.filter(c => c.id !== id);
+    saveOrder();
+    saveAdded();
+    updateCityCount();
+    // 重新计算 idx
+    $$('.city-card').forEach((c, i) => c.dataset.idx = i);
+    const city = CITY_DB_MAP[id];
+    showToast(`已移除 ${city?.name || id}`, 'success');
+  }, 380);
+}
+
+/* ============================================================
+   Toast 提示
+   ============================================================ */
+let toastTimer = null;
+function showToast(msg, type = 'info') {
+  let t = $('#toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);padding:12px 20px;font-size:13px;font-family:Orbitron,PingFang SC,sans-serif;letter-spacing:0.05em;z-index:1001;backdrop-filter:blur(16px);transition:opacity 0.3s,transform 0.3s;pointer-events:none;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));';
+    document.body.appendChild(t);
+  }
+  const colors = {
+    success: { bg: 'rgba(52, 199, 89, 0.15)', border: '#34C759', fg: '#86efac', glow: 'rgba(52, 199, 89, 0.5)' },
+    warn: { bg: 'rgba(255, 149, 0, 0.15)', border: '#FF9500', fg: '#fdba74', glow: 'rgba(255, 149, 0, 0.5)' },
+    error: { bg: 'rgba(255, 59, 48, 0.15)', border: '#FF3B30', fg: '#fca5a5', glow: 'rgba(255, 59, 48, 0.5)' },
+    info: { bg: 'rgba(0, 240, 255, 0.15)', border: '#00f0ff', fg: '#67e8f9', glow: 'rgba(0, 240, 255, 0.5)' },
+  };
+  const c = colors[type] || colors.info;
+  t.style.background = c.bg;
+  t.style.border = `1px solid ${c.border}`;
+  t.style.color = c.fg;
+  t.style.boxShadow = `0 0 20px ${c.glow}`;
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(-20px)';
+  }, 2400);
+}
+
+/* ============================================================
+   城市详情模态框
+   ============================================================ */
+let modalCityIdx = -1;
+
+async function openCityModal(idx) {
+  modalCityIdx = idx;
+  const city = CITIES[idx];
+  if (!city) return;
+  const item = modalDataCache?.[city.id];
+
+  // 立即填充基础信息 (城市数据是同步已知的)
+  $('#modalCityName').textContent = `${city.name} ${city.nameEn}`;
+  $('#modalCitySub').textContent = `${city.country} · ${city.countryEn} · ${fmtNum(city.population)} 人口`;
+  $('#modalInfo').innerHTML = `
+    <div class="mi-row"><span class="mi-label">城市 ID</span><span class="mi-value">${city.id}</span></div>
+    <div class="mi-row"><span class="mi-label">所在国家</span><span class="mi-value">${city.country} (${city.countryEn})</span></div>
+    <div class="mi-row"><span class="mi-label">人口数量</span><span class="mi-value">${city.population.toLocaleString()}</span></div>
+    <div class="mi-row"><span class="mi-label">时区</span><span class="mi-value">${city.timezone}</span></div>
+    <div class="mi-row"><span class="mi-label">纬度</span><span class="mi-value">${city.lat.toFixed(4)}° ${city.lat >= 0 ? 'N' : 'S'}</span></div>
+    <div class="mi-row"><span class="mi-label">经度</span><span class="mi-value">${city.lon.toFixed(4)}° ${city.lon >= 0 ? 'E' : 'W'}</span></div>
+  `;
+
+  // 加载状态
+  $('#modalIcon').textContent = '⏳';
+  $('#modalTemp').textContent = '--';
+  $('#modalDesc').textContent = '加载中...';
+  $('#modalGrid').innerHTML = '<div class="hud-item"><div class="lbl">加载中</div></div>';
+  $('#modalForecast').innerHTML = '';
+
+  $('#cityModal').classList.add('show');
+  $('#cityModal').setAttribute('aria-hidden', 'false');
+
+  try {
+    const data = item || await fetchWeather(city.lat, city.lon);
+    const cur = data.current;
+    const aqi = estimateAQI(cur, data.daily);
+    const uv = uvLevel(data.daily.uv_index_max?.[0] ?? 0);
+    const aq = aqiLevel(aqi);
+    $('#modalIcon').textContent = wmoIcon(cur.weather_code);
+    $('#modalTemp').textContent = fmt(cur.temperature_2m, 0);
+    $('#modalDesc').textContent = `${wmoDesc(cur.weather_code)} · 体感 ${fmt(cur.apparent_temperature, 0)}°C`;
+    $('#modalGrid').innerHTML = `
+      <div class="hud-item"><div class="lbl">湿度</div><div class="val">${cur.relative_humidity_2m}<span class="u">%</span></div></div>
+      <div class="hud-item"><div class="lbl">风速</div><div class="val">${fmt(cur.wind_speed_10m, 0)}<span class="u">km/h</span></div></div>
+      <div class="hud-item"><div class="lbl">AQI</div><div class="val" style="color:${aq.c}">${aqi}<span class="u">·${aq.l}</span></div></div>
+      <div class="hud-item"><div class="lbl">UV</div><div class="val" style="color:${uv.c}">${uv.l}</div></div>
+    `;
+    // 7 日预报
+    const days = data.daily.time;
+    $('#modalForecast').innerHTML = days.slice(0, 7).map((t, i) => {
+      const d = new Date(t);
+      const dayName = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+      return `
+        <div class="mf-day">
+          <div class="mf-date">${d.getMonth() + 1}/${d.getDate()}<br>${dayName}</div>
+          <div class="mf-icon">${wmoIcon(data.daily.weather_code[i])}</div>
+          <div class="mf-temp">${fmt(data.daily.temperature_2m_max[i], 0)}°<br><span class="lo">${fmt(data.daily.temperature_2m_min[i], 0)}°</span></div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    $('#modalDesc').textContent = '数据加载失败: ' + e.message;
+    $('#modalIcon').textContent = '⚠';
+  }
+}
+function closeCityModal() {
+  $('#cityModal').classList.remove('show');
+  $('#cityModal').setAttribute('aria-hidden', 'true');
+}
+
+function onDragStart(e) {
+  dragSrc = this;
+  const rect = this.getBoundingClientRect();
+  offsetX = e.clientX - rect.left;
+  offsetY = e.clientY - rect.top;
+
+  // 创建自定义 ghost
+  ghost = this.cloneNode(true);
+  ghost.classList.add('drag-ghost');
+  ghost.style.width = rect.width + 'px';
+  document.body.appendChild(ghost);
+
+  // 隐藏原生 ghost
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', this.dataset.id);
+  try { e.dataTransfer.setDragImage(new Image(), 0, 0); } catch {}
+
+  this.classList.add('dragging');
+  $('#cityGrid').classList.add('dragging');
+
+  // 同步 ghost 位置
+  moveGhost(e);
+  document.addEventListener('dragover', moveGhost);
+}
+function moveGhost(e) {
+  if (!ghost) return;
+  ghost.style.left = (e.clientX) + 'px';
+  ghost.style.top = (e.clientY) + 'px';
+}
+function onDragEnd() {
+  if (ghost) { ghost.remove(); ghost = null; }
+  this.classList.remove('dragging');
+  $$('.city-card').forEach(c => c.classList.remove('drag-over'));
+  $('#cityGrid').classList.remove('dragging');
+  document.removeEventListener('dragover', moveGhost);
+}
+function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function onDragEnter(e) {
+  e.preventDefault();
+  if (this === dragSrc) return;
+  this.classList.add('drag-over');
+}
+function onDragLeave() { this.classList.remove('drag-over'); }
+function onDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  if (this === dragSrc) return;
+
+  const grid = $('#cityGrid');
+  const all = [...$$('.city-card')];
+  const srcIdx = all.indexOf(dragSrc);
+  const dstIdx = all.indexOf(this);
+  if (srcIdx === -1 || dstIdx === -1) return;
+
+  // 重新排序 DOM
+  if (srcIdx < dstIdx) grid.insertBefore(dragSrc, this.nextSibling);
+  else grid.insertBefore(dragSrc, this);
+
+  // 重排 CITIES 数组以匹配 DOM
+  const newOrder = [...$$('.city-card')].map(c => c.dataset.id);
+  CITIES = CITIES.slice().sort((a, b) => newOrder.indexOf(a.id) - newOrder.indexOf(b.id));
+  saveOrder();
+}
+
+/* ============================================================
+   农历计算 (1900-2100 年, 简化版)
+   ============================================================ */
+const LUNAR_INFO = [
+  0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2, // 1900-1909
+  0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977, // 1910-1919
+  0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970, // 1920-1929
+  0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950, // 1930-1939
+  0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557, // 1940-1949
+  0x06ca0,0x0b550,0x15355,0x04da0,0x0a5b0,0x14573,0x052b0,0x0a9a8,0x0e950,0x06aa0, // 1950-1959
+  0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0, // 1960-1969
+  0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b6a0,0x195a6, // 1970-1979
+  0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570, // 1980-1989
+  0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x055c0,0x0ab60,0x096d5,0x092e0, // 1990-1999
+  0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5, // 2000-2009
+  0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930, // 2010-2019
+  0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530, // 2020-2029
+  0x05aa0,0x076a3,0x096d0,0x04afb,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45, // 2030-2039
+  0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0, // 2040-2049
+  0x14b63,0x09370,0x049f8,0x04970,0x064b0,0x168a6,0x0ea50,0x06b20,0x1a6c4,0x0aae0, // 2050-2059
+  0x0a2e0,0x0d2e3,0x0c960,0x0d557,0x0d4a0,0x0da50,0x05d55,0x056a0,0x0a6d0,0x055d4, // 2060-2069
+  0x052d0,0x0a9b8,0x0a950,0x0b4a0,0x0b6a6,0x0ad50,0x055a0,0x0aba4,0x0a5b0,0x052b0, // 2070-2079
+  0x0b273,0x06930,0x07337,0x06aa0,0x0ad50,0x14b55,0x04b60,0x0a570,0x054e4,0x0d160, // 2080-2089
+  0x0e968,0x0d520,0x0daa0,0x16aa6,0x056d0,0x04ae0,0x0a9d4,0x0a2d0,0x0d150,0x0f252, // 2090-2099
+  0x0d520, // 2100
+];
+
+const HEAVENLY_STEMS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+const EARTHLY_BRANCHES = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+const ZODIAC = ['鼠','牛','虎','兔','龙','蛇','马','羊','猴','鸡','狗','猪'];
+const LUNAR_MONTH = ['正','二','三','四','五','六','七','八','九','十','冬','腊'];
+const LUNAR_DAY = [
+  '初一','初二','初三','初四','初五','初六','初七','初八','初九','初十',
+  '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十',
+  '廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十',
+];
+const SOLAR_TERMS = [
+  { n: '小寒', m: 1, d: 5, i: '❄' }, { n: '大寒', m: 1, d: 20, i: '❄' },
+  { n: '立春', m: 2, d: 4, i: '🌱' }, { n: '雨水', m: 2, d: 19, i: '💧' },
+  { n: '惊蛰', m: 3, d: 5, i: '⚡' }, { n: '春分', m: 3, d: 20, i: '🌸' },
+  { n: '清明', m: 4, d: 4, i: '🌿' }, { n: '谷雨', m: 4, d: 19, i: '🌾' },
+  { n: '立夏', m: 5, d: 5, i: '☀' }, { n: '小满', m: 5, d: 20, i: '🌾' },
+  { n: '芒种', m: 6, d: 5, i: '🌾' }, { n: '夏至', m: 6, d: 21, i: '☀' },
+  { n: '小暑', m: 7, d: 7, i: '🔥' }, { n: '大暑', m: 7, d: 22, i: '🔥' },
+  { n: '立秋', m: 8, d: 7, i: '🍂' }, { n: '处暑', m: 8, d: 23, i: '🍂' },
+  { n: '白露', m: 9, d: 7, i: '🌙' }, { n: '秋分', m: 9, d: 22, i: '🌕' },
+  { n: '寒露', m: 10, d: 8, i: '🍁' }, { n: '霜降', m: 10, d: 23, i: '❄' },
+  { n: '立冬', m: 11, d: 7, i: '❄' }, { n: '小雪', m: 11, d: 22, i: '🌨' },
+  { n: '大雪', m: 12, d: 7, i: '❄' }, { n: '冬至', m: 12, d: 21, i: '☃' },
+];
+const WUXING = ['金','木','水','火','土']; // 简化
+
+function lunarYearDays(y) {
+  let sum = 348; // 12 * 29
+  for (let i = 0x8000; i > 0x8; i >>= 1) {
+    if ((LUNAR_INFO[y - 1900] & i) !== 0) sum++;
+  }
+  return sum + leapDays(y);
+}
+function leapMonth(y) { return LUNAR_INFO[y - 1900] & 0xf; }
+function leapDays(y) {
+  if (leapMonth(y)) return (LUNAR_INFO[y - 1900] & 0x10000) ? 30 : 29;
+  return 0;
+}
+function monthDays(y, m) {
+  return (LUNAR_INFO[y - 1900] & (0x10000 >> m)) ? 30 : 29;
+}
+
+function solarToLunar(date) {
+  // 基准: 1900-01-31 = 农历 1900-01-01
+  const baseDate = new Date(1900, 0, 31);
+  const offset = Math.floor((date - baseDate) / 86400000);
+  let i, temp = 0;
+  for (i = 1900; i < 2050 && temp + lunarYearDays(i) <= offset; i++) {
+    temp += lunarYearDays(i);
+  }
+  const lunarYear = i;
+  let lunarMonth = 1, leap = leapMonth(i);
+  let isLeap = false;
+  for (i = 1; i < 13 && temp < offset; i++) {
+    if (leap > 0 && i === leap + 1 && !isLeap) {
+      --i; isLeap = true; temp += leapDays(lunarYear);
+    } else {
+      temp += monthDays(lunarYear, i);
+      if (isLeap && i === leap) isLeap = false;
+    }
+    if (temp > offset) break;
+    lunarMonth = i + (isLeap ? 0 : 0);
+  }
+  if (temp === offset && leap > 0 && i === leap + 1) {
+    if (isLeap) { isLeap = false; }
+    else { isLeap = true; --i; --lunarMonth; }
+  }
+  const lunarDay = offset - temp + 1;
+  return { year: lunarYear, month: lunarMonth, day: lunarDay, isLeap };
+}
+
+function getGanzhiYear(lunarYear) {
+  // 1900 年是庚子年 (天干 6, 地支 0)
+  const stemIdx = (lunarYear - 1900 + 6) % 10;
+  const branchIdx = (lunarYear - 1900) % 12;
+  return HEAVENLY_STEMS[stemIdx] + EARTHLY_BRANCHES[branchIdx];
+}
+function getZodiac(lunarYear) {
+  return ZODIAC[(lunarYear - 1900) % 12];
+}
+
+function getCurrentSolarTerm(date) {
+  const m = date.getMonth() + 1, d = date.getDate();
+  // 找最近的节气 (向前 + 向后各一)
+  let prev = SOLAR_TERMS[SOLAR_TERMS.length - 1];
+  let next = SOLAR_TERMS[0];
+  for (let i = 0; i < SOLAR_TERMS.length; i++) {
+    const t = SOLAR_TERMS[i];
+    if (t.m === m && t.d === d) return { term: t, daysToNext: 0, isExact: true };
+    // 简化: 不做精确跨月比较
+  }
+  // 找当月及前后
+  const year = date.getFullYear();
+  const allTerms = [];
+  for (let i = 0; i < SOLAR_TERMS.length; i++) {
+    allTerms.push({ ...SOLAR_TERMS[i], date: new Date(year, SOLAR_TERMS[i].m - 1, SOLAR_TERMS[i].d) });
+  }
+  // 跨年: 上一个冬至
+  allTerms.unshift({ ...SOLAR_TERMS[23], date: new Date(year - 1, 11, 21) });
+  for (let i = 0; i < allTerms.length - 1; i++) {
+    if (allTerms[i].date <= date && allTerms[i + 1].date > date) {
+      const daysToNext = Math.ceil((allTerms[i + 1].date - date) / 86400000);
+      const daysSince = Math.floor((date - allTerms[i].date) / 86400000);
+      return { term: allTerms[i], next: allTerms[i + 1], daysSince, daysToNext };
+    }
+  }
+  return { term: allTerms[0] };
+}
+
+/* ============================================================
+   每日宜忌 / 生肖 (查表 - 用日期种子保证同一天稳定)
+   ============================================================ */
+const YI_POOL = ['祭祀','出行','动土','上梁','嫁娶','入宅','修造','安门','开市','交易','纳财','理发','沐浴','扫舍','教牛马','习艺','求医','治病','破屋','坏垣','分居','入殓','移柩','启攒','安葬','立碑','造庙','祈福','斋醮','酬神'];
+const JI_POOL = ['嫁娶','开市','安葬','动土','破土','入宅','移徙','出火','理发','作灶','造船','掘井','栽种','牧养','祈福','求嗣','上梁','筑堤','放水','开仓','出货','纳采','问名','订盟','纳婿'];
+
+function seededPick(arr, seed, n) {
+  const result = [];
+  const used = new Set();
+  let s = seed;
+  while (result.length < n && used.size < arr.length) {
+    s = (s * 9301 + 49297) % 233280;
+    const idx = Math.floor((s / 233280) * arr.length);
+    if (!used.has(idx)) { used.add(idx); result.push(arr[idx]); }
+  }
+  return result;
+}
+
+function daySeed(date) {
+  return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+}
+
+function getYiJi(date) {
+  const seed = daySeed(date);
+  return {
+    yi: seededPick(YI_POOL, seed, 6),
+    ji: seededPick(JI_POOL, seed + 999, 5),
+  };
+}
+
+function getWuxing(date) {
+  const seed = daySeed(date) % 5;
+  return WUXING[seed];
+}
+
+function getChongsha(date) {
+  const branches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+  const dayBranchIdx = (Math.floor((date - new Date(1900, 0, 31)) / 86400000) - 11 + 1200) % 12;
+  const dayBranch = branches[dayBranchIdx];
+  const zodiacs = ZODIAC;
+  // 冲: 地支相隔 6 位
+  const oppositeIdx = (dayBranchIdx + 6) % 12;
+  const oppositeZodiac = zodiacs[oppositeIdx];
+  // 煞: 冲的对冲
+  const shaDirs = ['北','南','东','西','中','北','南','东','西','中','北','南'];
+  const shaDir = shaDirs[dayBranchIdx];
+  return `冲${oppositeZodiac} · 煞${shaDir}`;
+}
+
+function getShengxiaoFortune(date) {
+  const seed = daySeed(date);
+  const fortunes = ['大吉','吉','中','小吉','凶'];
+  return ZODIAC.map((name, i) => ({
+    name,
+    fortune: fortunes[Math.floor(((seed * (i + 1) * 9301 + 49297) % 233280) / 233280 * fortunes.length)],
+  }));
+}
+
+/* ============================================================
+   渲染: 黄历
+   ============================================================ */
+function renderAlmanac(date = new Date()) {
+  const lunar = solarToLunar(date);
+  const ganzhi = getGanzhiYear(lunar.year);
+  const zodiac = getZodiac(lunar.year);
+  const term = getCurrentSolarTerm(date);
+
+  $('#almDateLabel').textContent = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  $('#ganzhi').textContent = `${ganzhi}年`;
+  $('#ganzhiAnimal').textContent = `${zodiac}年 · 农历${lunar.isLeap ? '闰' : ''}${LUNAR_MONTH[lunar.month - 1]}月${LUNAR_DAY[lunar.day - 1]}`;
+  $('#lunarDate').textContent = `${lunar.isLeap ? '闰' : ''}${LUNAR_MONTH[lunar.month - 1]}月${LUNAR_DAY[lunar.day - 1]}`;
+  $('#lunarMonth').textContent = `农历 · ${lunar.year}年`;
+  $('#jieqiIcon').textContent = term.term.i;
+  $('#jieqiName').textContent = term.term.n;
+  $('#jieqiDays').textContent = term.isExact ? '今日节气' : `已过 ${term.daysSince || 0} 天 · 距下个 ${term.next?.n || '--'} ${term.daysToNext || '--'} 天`;
+  $('#wuxing').textContent = getWuxing(date);
+  $('#chongsha').textContent = getChongsha(date);
+
+  const { yi, ji } = getYiJi(date);
+  $('#yiList').innerHTML = yi.map(x => `<span>${x}</span>`).join('');
+  $('#jiList').innerHTML = ji.map(x => `<span>${x}</span>`).join('');
+
+  const sx = getShengxiaoFortune(date);
+  $('#shengxiaoGrid').innerHTML = sx.map(s => `
+    <div class="sx-item" data-luck="${s.fortune}">
+      <div class="sx-name">${s.name}</div>
+      <div class="sx-fortune">${s.fortune}</div>
+    </div>
+  `).join('');
+}
+
+/* ============================================================
+   实时时钟
+   ============================================================ */
+function tickClock() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  $('#clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/* ============================================================
+   工具函数: querySelectorAll
+   ============================================================ */
+function $$(s) { return document.querySelectorAll(s); }
+
+/* ============================================================
+   主流程
+   ============================================================ */
+async function init() {
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  renderAlmanac();
+  renderSkeleton();
+  updateCityCount();
+
+  $('#statusText').textContent = '正在获取数据...';
+
+  try {
+    const items = await fetchAllWeather();
+    const success = items.filter(i => !i.error).length;
+    if (success === 0) throw new Error('所有城市数据获取失败');
+    if (success < items.length) {
+      $('#errorBanner').textContent = `部分城市连接中断 (${items.length - success}/${items.length})`;
+      $('#errorBanner').classList.add('show');
+    }
+    // 缓存天气数据供模态框使用
+    modalDataCache = {};
+    items.forEach(it => { if (!it.error && it.data) modalDataCache[it.city.id] = it.data; });
+    renderCities(items);
+    $('#statusText').textContent = `在线 · ${success} 节点`;
+  } catch (e) {
+    $('#errorBanner').textContent = '数据连接失败: ' + e.message;
+    $('#errorBanner').classList.add('show');
+    $('#statusText').textContent = '离线模式';
+  }
+}
+
+/* ============================================================
+   事件绑定
+   ============================================================ */
+function bindUI() {
+  // 搜索
+  const search = $('#citySearch');
+  const clearBtn = $('#searchClear');
+  let searchTimer = null;
+  search.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = search.value.trim();
+    clearBtn.style.display = q ? 'block' : 'none';
+    searchTimer = setTimeout(() => renderSearchResults(searchCities(q), q), 100);
+  });
+  search.addEventListener('focus', () => {
+    if (search.value.trim()) renderSearchResults(searchCities(search.value.trim()), search.value.trim());
+  });
+  clearBtn.addEventListener('click', () => {
+    search.value = '';
+    clearBtn.style.display = 'none';
+    $('#searchDropdown').classList.remove('show');
+    search.focus();
+  });
+  // 滚动 / 缩放时重新定位
+  window.addEventListener('scroll', () => {
+    if ($('#searchDropdown').classList.contains('show')) positionSearchDropdown();
+  }, true);
+  window.addEventListener('resize', () => {
+    if ($('#searchDropdown').classList.contains('show')) positionSearchDropdown();
+  });
+  // 点击外部关闭下拉
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#toolbarSearch') && !e.target.closest('#searchDropdown')) {
+      $('#searchDropdown').classList.remove('show');
+    }
+  });
+  // 键盘: ESC 关闭
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if ($('#cityModal').classList.contains('show')) closeCityModal();
+      $('#searchDropdown').classList.remove('show');
+    }
+  });
+  // 模态框关闭
+  $('#modalClose').addEventListener('click', closeCityModal);
+  $('#cityModal').addEventListener('click', (e) => {
+    if (e.target.id === 'cityModal') closeCityModal();
+  });
+  // 模态框内移除
+  $('#modalRemove').addEventListener('click', () => {
+    if (modalCityIdx < 0) return;
+    const id = CITIES[modalCityIdx]?.id;
+    if (id) {
+      closeCityModal();
+      setTimeout(() => removeCity(id), 200);
+    }
+  });
+}
+bindUI();
+
+/* 工具栏按钮 */
+$('#refreshBtn').addEventListener('click', () => {
+  $('#refreshBtn').classList.add('active');
+  init().then(() => setTimeout(() => $('#refreshBtn').classList.remove('active'), 600));
+});
+$('#resetBtn').addEventListener('click', () => {
+  if (confirm('确认恢复默认排序?')) {
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+});
+
+/* ============================================================
+   主题切换 (赛博朋克 ↔ iOS UI)
+   ============================================================ */
+const THEME_KEY = 'cyberWeatherTheme';
+function applyTheme(theme) {
+  document.body.classList.toggle('theme-ios', theme === 'ios');
+  document.documentElement.style.colorScheme = theme === 'ios' ? 'light' : 'dark';
+  $('#themeToggle').setAttribute('aria-label', theme === 'ios' ? '切换到赛博朋克风格' : '切换到 iOS 风格');
+  $('#themeToggle').title = theme === 'ios' ? '切换到赛博朋克' : '切换到 iOS';
+}
+function toggleTheme() {
+  const cur = document.body.classList.contains('theme-ios') ? 'ios' : 'cyber';
+  const next = cur === 'ios' ? 'cyber' : 'ios';
+  applyTheme(next);
+  try { localStorage.setItem(THEME_KEY, next); } catch {}
+  // 重新渲染 sparkline 渐变 ID 避免冲突
+  $$('.spark defs linearGradient').forEach((g, i) => g.id = 'sg_' + Date.now() + '_' + i);
+  $$('.spark path').forEach((p, i) => { const id = p.getAttribute('fill'); });
+}
+$('#themeToggle').addEventListener('click', toggleTheme);
+// 恢复上次的偏好
+try {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved) applyTheme(saved);
+} catch {}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
