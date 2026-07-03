@@ -1,0 +1,307 @@
+<view class="page {{theme === 'ios' ? 'theme-ios' : ''}}">
+  <!-- 背景层 -->
+  <view class="bg-base"></view>
+  <view class="bg-grid"></view>
+  <view class="bg-orb bg-orb-1"></view>
+  <view class="bg-orb bg-orb-2"></view>
+  <view class="bg-scanlines"></view>
+
+  <!-- 头部 -->
+  <view class="container">
+    <view class="header">
+      <view class="brand">
+        <view class="brand-mark">
+          <view class="brand-mark-dot"></view>
+        </view>
+        <view class="brand-text">
+          <text class="brand-title">CYBER · WEATHER</text>
+          <text class="brand-sub">// 实时气象 · 农历黄历</text>
+        </view>
+      </view>
+      <view class="header-right">
+        <text class="clock">{{now}}</text>
+        <view class="status-pill">
+          <view class="status-dot"></view>
+          <text>{{statusText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 错误横幅 -->
+    <view class="error-banner {{errorShow ? 'show' : ''}}">{{errorBanner}}</view>
+
+    <!-- 工具栏: 搜索 + 按钮 -->
+    <view class="toolbar">
+      <view class="toolbar-search" id="toolbarSearch">
+        <text class="search-icon">⌕</text>
+        <input
+          class="search-input"
+          type="text"
+          value="{{searchQuery}}"
+          placeholder="搜索城市 (中文/英文)..."
+          bindinput="onSearchInput"
+          bindfocus="onSearchFocus"
+          bindblur="onSearchBlur"
+          confirm-type="search"
+        />
+        <view class="search-clear {{searchQuery ? 'show' : ''}}" bindtap="onSearchClear">×</view>
+      </view>
+      <view class="toolbar-actions">
+        <view class="btn reset" bindtap="resetOrder">⟲ 重置</view>
+        <view class="btn refresh" bindtap="refresh">↻ 刷新</view>
+      </view>
+    </view>
+
+    <!-- 搜索下拉 (浮层) -->
+    <view class="search-dropdown {{showDropdown ? 'show' : ''}}" wx:if="{{searchResults.length > 0}}">
+      <block wx:for="{{searchResults}}" wx:key="id">
+        <view
+          class="search-item {{item.isAdded ? 'disabled' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="{{item.isAdded ? '' : 'addCity'}}"
+        >
+          <view class="si-flag">{{item.countryEn === 'CN' ? 'CN' : item.countryEn}}</view>
+          <view class="si-info">
+            <view class="si-name">{{item.name}} <text class="si-name-en">{{item.nameEn}}</text></view>
+            <view class="si-meta">{{item.country}} · {{item.timezone}}</view>
+          </view>
+          <view class="si-action">
+            <text wx:if="{{item.isAdded}}">已添加</text>
+            <text wx:elif="{{!item.canAddMore}}">已满</text>
+            <text wx:else class="add">+ 添加</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <!-- 城市卡片网格 -->
+    <view class="city-grid">
+      <view
+        class="city-card {{item.loading ? 'loading' : ''}}"
+        wx:for="{{cities}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="openCityModal"
+        hover-class="hover"
+      >
+        <view class="scan"></view>
+        <view class="barcode">
+          <view></view><view></view><view></view><view></view><view></view>
+          <view></view><view></view><view></view><view></view><view></view>
+        </view>
+        <view class="card-head">
+          <view class="card-loc">
+            <view class="name">{{item.city.name}}</view>
+            <view class="meta">
+              <text wx:if="{{!item.loading}}">{{item.current.temperature_2m}}°C · {{item.desc}}</text>
+              <text wx:else>加载中...</text>
+            </view>
+          </view>
+          <view class="remove-btn" catchtap="removeCity" data-id="{{item.id}}">×</view>
+        </view>
+        <view class="card-body">
+          <view class="temp-block">
+            <block wx:if="{{!item.loading}}">
+              <text class="now">{{item.current.temperature_2m}}</text>
+              <text class="unit">°C</text>
+            </block>
+            <block wx:else>
+              <text class="now">--</text>
+              <text class="unit">°C</text>
+            </block>
+            <view class="desc">
+              <text wx:if="{{!item.loading}}">体感 {{item.current.apparent_temperature}}°C</text>
+              <text wx:else>正在获取数据</text>
+            </view>
+          </view>
+          <view class="weather-icon">
+            <text wx:if="{{!item.loading}}">{{item.icon}}</text>
+            <text wx:else>⏳</text>
+          </view>
+        </view>
+        <view class="hud-grid">
+          <view class="hud-item">
+            <view class="lbl">湿度 / RH</view>
+            <view class="val">
+              <block wx:if="{{!item.loading}}">{{item.current.relative_humidity_2m}}<text class="u">%</text></block>
+              <text wx:else>--</text>
+            </view>
+          </view>
+          <view class="hud-item">
+            <view class="lbl">风速 / WIND</view>
+            <view class="val">
+              <block wx:if="{{!item.loading}}">{{item.current.wind_speed_10m}}<text class="u">km/h</text></block>
+              <text wx:else>--</text>
+            </view>
+          </view>
+          <view class="hud-item">
+            <view class="lbl">AQI</view>
+            <view class="val" style="color:{{item.aq ? item.aq.c : '#888'}}">
+              <block wx:if="{{!item.loading}}">{{item.aqi}}<text class="u" style="color:{{item.aq ? item.aq.c : '#888'}}">·{{item.aq ? item.aq.l : '--'}}</text></block>
+              <text wx:else>--</text>
+            </view>
+          </view>
+          <view class="hud-item">
+            <view class="lbl">UV / 紫外</view>
+            <view class="val" style="color:{{item.uv ? item.uv.c : '#888'}}">
+              <block wx:if="{{!item.loading}}">{{item.uv ? item.uv.l : '--'}}</block>
+              <text wx:else>--</text>
+            </view>
+          </view>
+        </view>
+        <view class="micro-charts">
+          <view class="micro-info">
+            <view class="ttl">今日</view>
+            <view class="val">
+              <text wx:if="{{!item.loading}}">{{item.daily.temperature_2m_min[0]}}° → {{item.daily.temperature_2m_max[0]}}°</text>
+              <text wx:else>--</text>
+            </view>
+          </view>
+          <view class="micro-info">
+            <view class="ttl">降水</view>
+            <view class="val">
+              <text wx:if="{{!item.loading}}">{{item.daily.precipitation_probability_max[0]}}%</text>
+              <text wx:else>--</text>
+            </view>
+          </view>
+          <view class="pop-bar">
+            <view class="pop-bar-fg" style="width: {{item.loading ? 0 : item.daily.precipitation_probability_max[0]}}%;"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 黄历 -->
+    <view class="almanac" wx:if="{{almanac}}">
+      <view class="alm-head">
+        <view class="alm-head-l">
+          <text class="alm-title">赛博黄历</text>
+          <text class="alm-sub">// TRADITIONAL ALMANAC</text>
+        </view>
+        <view class="alm-head-r">
+          <text class="alm-date">{{now}}</text>
+        </view>
+      </view>
+      <view class="alm-grid">
+        <view class="alm-cell ganzhi">
+          <view class="cell-label">干支纪年</view>
+          <view class="cell-value">{{almanac.ganzhi}}{{almanac.zodiac}}年</view>
+        </view>
+        <view class="alm-cell">
+          <view class="cell-label">农历</view>
+          <view class="cell-value">{{almanac.monthName}}{{almanac.dayName}}</view>
+        </view>
+        <view class="alm-cell">
+          <view class="cell-label">节气</view>
+          <view class="cell-value">{{almanac.termName}}</view>
+          <view class="cell-sub">距下个节气 {{almanac.daysToNext}} 天</view>
+        </view>
+        <view class="alm-cell">
+          <view class="cell-label">五行 / 冲煞</view>
+          <view class="cell-value">{{almanac.wuxing}}行</view>
+          <view class="cell-sub">{{almanac.chong}} · {{almanac.sha}}</view>
+        </view>
+      </view>
+      <view class="alm-yiji">
+        <view class="yiji-block yi">
+          <view class="yiji-label">宜</view>
+          <view class="yiji-tags">
+            <text class="tag" wx:for="{{almanac.yi}}" wx:key="*this">{{item}}</text>
+          </view>
+        </view>
+        <view class="yiji-block ji">
+          <view class="yiji-label">忌</view>
+          <view class="yiji-tags">
+            <text class="tag" wx:for="{{almanac.ji}}" wx:key="*this">{{item}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="alm-shengxiao">
+        <view class="sx-label">十二生肖运势</view>
+        <view class="sx-grid">
+          <view class="sx-item" wx:for="{{almanac.shengxiao}}" wx:key="name" data-luck="{{item.fortune}}">
+            <view class="sx-name">{{item.name}}</view>
+            <view class="sx-fortune">{{item.fortune}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 主题切换器 (右下角) -->
+  <view class="theme-toggle" bindtap="toggleTheme">
+    <view class="theme-icon theme-icon-cyber" wx:if="{{theme === 'cyber'}}">⚡</view>
+    <view class="theme-icon theme-icon-ios" wx:else>◉</view>
+  </view>
+
+  <!-- Toast -->
+  <view class="toast {{toast ? 'show' : ''}} {{toast ? toast.type : ''}}" wx:if="{{toast}}">
+    <text>{{toast.msg}}</text>
+  </view>
+
+  <!-- 模态框 -->
+  <view class="modal-mask {{showModal ? 'show' : ''}}" wx:if="{{showModal}}" catchtap="closeModal">
+    <view class="modal" catchtap="stopProp">
+      <view class="modal-head">
+        <view>
+          <view class="modal-title">{{modalCity.city.name}}</view>
+          <view class="modal-sub">{{modalCity.city.nameEn}} · {{modalCity.city.country}}</view>
+        </view>
+        <view class="modal-close" catchtap="closeModal">×</view>
+      </view>
+      <view class="modal-temp" wx:if="{{!modalCity.loading}}">
+        <text class="modal-temp-now">{{modalCity.current.temperature_2m}}</text>
+        <text class="modal-temp-unit">°C</text>
+        <text class="modal-temp-desc">{{modalCity.icon}} {{modalCity.desc}}</text>
+      </view>
+      <view class="modal-info">
+        <view class="info-row">
+          <text class="info-label">体感温度</text>
+          <text class="info-value">{{modalCity.current.apparent_temperature || '--'}}°C</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">湿度</text>
+          <text class="info-value">{{modalCity.current.relative_humidity_2m || '--'}}%</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">风速</text>
+          <text class="info-value">{{modalCity.current.wind_speed_10m || '--'}} km/h</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">空气质量</text>
+          <text class="info-value" style="color:{{modalCity.aq ? modalCity.aq.c : '#888'}}">AQI {{modalCity.aqi}} · {{modalCity.aq ? modalCity.aq.l : '--'}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">紫外线</text>
+          <text class="info-value" style="color:{{modalCity.uv ? modalCity.uv.c : '#888'}}">{{modalCity.uv ? modalCity.uv.l : '--'}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">人口</text>
+          <text class="info-value">{{modalCity.city.population ? (modalCity.city.population / 10000).toFixed(0) + ' 万' : '--'}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">时区</text>
+          <text class="info-value small">{{modalCity.city.timezone || '--'}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">经纬度</text>
+          <text class="info-value small">{{modalCity.city.lat}}, {{modalCity.city.lon}}</text>
+        </view>
+      </view>
+      <view class="modal-forecast" wx:if="{{modalCity.daily.length}}">
+        <view class="forecast-title">未来 7 日</view>
+        <view class="forecast-list">
+          <view class="forecast-item" wx:for="{{modalCity.daily}}" wx:key="date">
+            <text class="fc-date">{{item.date.slice(5)}}</text>
+            <text class="fc-icon">{{item.code >= 0 ? (item.icon || '') : ''}}</text>
+            <text class="fc-temp">{{item.min}}° ~ {{item.max}}°</text>
+          </view>
+        </view>
+      </view>
+      <view class="modal-actions">
+        <view class="modal-btn modal-btn-danger" catchtap="modalRemove">移除城市</view>
+        <view class="modal-btn modal-btn-primary" catchtap="closeModal">关闭</view>
+      </view>
+    </view>
+  </view>
+</view>

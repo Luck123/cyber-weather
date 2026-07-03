@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#04050d",
+    "navigationBarTitleText": "赛博天气 · 农历黄历",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#04050d",
+    "enablePullDownRefresh": false
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "permission": {}
+}

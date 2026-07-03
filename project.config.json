@@ -1,0 +1,16 @@
+{
+  "description": "赛博天气 - 微信小程序版本",
+  "miniprogramRoot": "miniprogram/",
+  "projectname": "cyber-weather-mp",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "newFeature": true,
+    "autoAudits": false
+  },
+  "compileType": "miniprogram"
+}
