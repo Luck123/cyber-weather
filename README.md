@@ -1,6 +1,7 @@
 # 赛博天气 / Cyber Weather
 
 > 赛博朋克 + iOS 双风格天气应用，集成农历黄历、3D 城市搜索、模态框详情、拖拽排序与主题切换
+> 体验链接：https://luck123.github.io/cyber-weather/
 
 一个零依赖的单文件 HTML 应用（`cyber-weather.html`），通过浏览器 Geolocation + Open-Meteo 免费 API 实时获取数据。
 
